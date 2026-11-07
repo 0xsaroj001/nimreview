@@ -3,12 +3,14 @@ import { esc, icon, avatar, stars, methodBadge, timeAgo, toast } from '../ui.js'
 import { accountTrust, POLICY } from '../core/genuine.js';
 import { formatNim, shortAddress } from '../core/nimiq.js';
 import { resetWriteDraft } from './write.js';
+import { isLive, signOut } from '../session.js';
 
 export function meView() {
   const u = me();
   const t = accountTrust(u, Date.now());
   const b = wallet();
-  const mine = state.reviews.filter((r) => r.authorId === 'u_me').sort((a, c) => c.createdAt - a.createdAt);
+  const mine = state.reviews.filter((r) => r.authorId === state.meId).sort((a, c) => c.createdAt - a.createdAt);
+  const live = isLive();
   const next = t.tier === 'new' ? 6 : t.tier === 'regular' ? 14 : 20;
   const html = `
   <div class="page">
@@ -32,17 +34,17 @@ export function meView() {
         <section class="section">
           <div class="card menu">
             <a href="#/trust"><span class="ic">${icon('shield')}</span>How reviews stay genuine${icon('chevron-right', 'chev')}</a>
-            <a href="#/owner"><span class="ic">${icon('store')}</span>Owner view (demo)${icon('chevron-right', 'chev')}</a>
-            <button data-reset><span class="ic">${icon('refresh')}</span>Reset demo data${icon('chevron-right', 'chev')}</button>
+            ${live ? `<a href="#/connect"><span class="ic">${icon('wallet')}</span>Wallet · ${esc(shortAddress(u.nimAddress))}${icon('chevron-right', 'chev')}</a>` : `<button data-reset><span class="ic">${icon('refresh')}</span>Reset demo data${icon('chevron-right', 'chev')}</button>`}
+            <button data-logout><span class="ic">${icon('switch')}</span>${live ? 'Sign out' : 'Leave the demo'}${icon('chevron-right', 'chev')}</button>
           </div>
         </section>
       </div>
       <div class="col">
         <section class="section">
-          <div class="section-h"><h2>My <em>reviews</em></h2><span class="eyebrow">this device</span></div>
+          <div class="section-h"><h2>My <em>reviews</em></h2><span class="eyebrow">${live ? 'your account' : 'this device'}</span></div>
           <div class="card" style="margin:0 var(--gutter)">
             ${mine.length ? mine.map((r) => `<a class="myrev" href="#/venue/${r.venueId}"><div class="grow"><b class="ellipsis">${esc(venue(r.venueId).name)}</b><div class="row tiny muted" style="gap:6px;margin-top:4px">${stars(r.rating, 'sm')}<span>${timeAgo(r.createdAt)} · score ${r.score}</span></div></div>${methodBadge(r.method)}</a>`).join('')
-              : `<div class="empty">${icon('edit')}Reviews you write show up here. Your ${u.reviewCount} earlier ones are counted in the stats.</div>`}
+              : `<div class="empty">${icon('edit')}Reviews you write show up here.${live ? '' : ` Your ${u.reviewCount} earlier ones are counted in the stats.`}</div>`}
           </div>
         </section>
       </div>
@@ -50,7 +52,8 @@ export function meView() {
   </div>`;
 
   function mount(root) {
-    root.querySelector('[data-reset]').addEventListener('click', () => {
+    root.querySelector('[data-logout]').addEventListener('click', signOut);
+    root.querySelector('[data-reset]')?.addEventListener('click', () => {
       resetDemo();
       resetWriteDraft();
       toast(`${icon('refresh')} Demo data reset`);

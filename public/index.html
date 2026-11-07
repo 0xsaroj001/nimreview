@@ -62,15 +62,20 @@
 
   <header class="sitebar" id="sitebar">
     <a class="logo" href="#/" aria-label="NimReview home"><svg class="i"><use href="#i-hex"/></svg><span>Nim<em>review</em></span></a>
-    <nav aria-label="Main">
+    <nav aria-label="Main" data-for="customer">
       <a href="#/" data-tab="explore">Explore</a>
       <a href="#/perks" data-tab="perks">Perks</a>
       <a href="#/wallet" data-tab="wallet">Wallet</a>
       <a href="#/me" data-tab="me">Profile</a>
-      <a href="#/owner" data-tab="owner">For owners</a>
     </nav>
-    <a class="nim-chip" href="#/wallet" id="site-bal" aria-label="Wallet balance"></a>
-    <a class="btn gold sm" href="#/write"><svg class="i"><use href="#i-edit"/></svg>Write a review</a>
+    <nav aria-label="Venue" data-for="venue">
+      <a href="#/owner" data-tab="owner">Dashboard</a>
+      <a href="#/listing" data-tab="listing" data-live-only>Listing</a>
+      <a href="#/trust" data-tab="trust">How reviews stay genuine</a>
+    </nav>
+    <a class="nim-chip" href="#/wallet" id="site-bal" aria-label="Wallet balance" data-for="customer"></a>
+    <a class="btn gold sm" href="#/write" data-for="customer"><svg class="i"><use href="#i-edit"/></svg>Write a review</a>
+    <button class="btn ghost sm" data-logout data-for="signed-in">Sign out</button>
   </header>
 
   <main id="view" tabindex="-1"></main>

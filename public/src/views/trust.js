@@ -48,7 +48,7 @@ export function trustView() {
   const html = `
   <div class="page">
     <div class="titlebar"><button class="icon-btn" data-back aria-label="Back">${icon('back')}</button><h1>Genuine reviews</h1><span></span></div>
-    <div class="page-head"><h2>Paying for reviews only works if <em>fakes cost more than they earn.</em></h2><p>Six layers checked on every review. Score ${P.minRewardScore}/100 or more to earn up to ${P.baseReward} NIM.</p></div>
+    <div class="page-head"><h2>Paying for reviews only works if <em>fakes cost more than they earn.</em></h2><p>Six layers checked on every review. Score ${P.minRewardScore}/100 or more to earn the venue's per-review reward, scaled by the score.</p></div>
     <div class="layers">
       ${LAYERS.map((l, i) => `<section class="layer card"><span class="n">${i + 1}</span><div class="body"><h3>${l.title}</h3>${l.body ? `<p>${l.body}</p>` : ''}${l.list ? `<ul>${l.list.map((x) => `<li>${x}</li>`).join('')}</ul>` : ''}</div></section>`).join('')}
       <section class="layer card dark"><span class="n">!</span><div class="body"><h3>What this cannot stop</h3><p>A real customer who really paid and writes a dishonest review. Rating-neutral rewards remove the money motive; reports, helpful votes and the unlock window handle the rest.</p></div></section>
@@ -57,5 +57,5 @@ export function trustView() {
   function mount(root) {
     root.querySelector('[data-back]').addEventListener('click', () => (history.length > 1 ? history.back() : (location.hash = '#/')));
   }
-  return { html, mount, tabs: false };
+  return { html, mount, tabs: false, tab: 'trust' };
 }

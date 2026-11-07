@@ -1,6 +1,7 @@
 import { state, venue, wallet, claimPerk } from '../store.js';
-import { esc, icon, openSheet, toast, copy, timeAgo } from '../ui.js';
+import { esc, icon, openSheet, toast, copy, timeAgo, bgImg } from '../ui.js';
 import { formatNim } from '../core/nimiq.js';
+import { isDemo } from '../session.js';
 
 export function perksView() {
   const b = wallet();
@@ -13,12 +14,13 @@ export function perksView() {
       ${mine.map(({ m, p }) => `<button class="ticket ${m.used ? 'used' : ''}" data-show="${m.id}"><span class="l">${icon('gift')}</span><span class="r"><b class="ellipsis">${esc(p.title)}</b><span class="tiny muted">${esc(venue(p.venueId).name)} · ${m.used ? 'used' : 'ready to use'}</span><br><code>${esc(m.code)}</code></span></button>`).join('')}
     </div></section>` : ''}
     <section class="section">
-      <div class="section-h"><h2>Available <em>now</em></h2><span class="pill demo">Demo perks</span></div>
+      <div class="section-h"><h2>Available <em>now</em></h2>${isDemo() ? '<span class="pill demo">Demo perks</span>' : ''}</div>
+      ${state.perks.length ? '' : `<div class="card empty" style="margin:0 var(--gutter)">${icon('gift')}No perks yet. Venues will be able to offer perks you can spend NIM on.</div>`}
       <div class="perk-grid">
         ${state.perks.map((p) => {
           const v = venue(p.venueId);
           const can = b.claimable >= p.cost;
-          return `<article class="perk"><div class="media" style="background-image:url('${v.img.replace('w=900', 'w=500')}')"></div><div class="tear"></div>
+          return `<article class="perk"><div class="media" style="${bgImg(v.img, 500)}"></div><div class="tear"></div>
             <div class="body"><span class="venue ellipsis">${esc(v.name)}</span><h3>${esc(p.title)}</h3><p>${esc(p.terms)}</p>
             <button class="btn ${can ? 'gold' : 'soft'}" data-claim="${p.id}" ${can ? '' : 'disabled'}><span class="nim">${icon('hex')}${p.cost}</span></button></div></article>`;
         }).join('')}

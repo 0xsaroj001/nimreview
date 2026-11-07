@@ -1,41 +1,78 @@
-// Local demo store (localStorage). In production every write below is a server call and the
-// genuineness engine runs there; here it runs in the browser so the prototype works offline.
-import { createSeed } from './data/seed.js';
+// App state. Demo sessions run on the fictional seed data in localStorage (no real NIM, nothing leaves the
+// device). Live sessions load the same shape from the backend, and every write goes through the API, where the
+// genuineness engine re-runs; the browser copy of the engine only previews the score.
+import { createSeed, DEMO_CENTER } from './data/seed.js';
 import { evaluateReview, settleLedger, balances, weightedRating, makeReceiptCode, normalizeCode, haversineMeters } from './core/genuine.js';
+import { getSession, isLive, api, updateSession } from './session.js';
 
 const KEY = 'nimreview:v1';
 const DAY = 864e5;
-const listeners = new Set();
 
-function load() {
+const empty = () => ({
+  version: 1, meId: null, here: { ...DEMO_CENTER, real: false },
+  venues: [], users: {}, reviews: [], receipts: [], transactions: [], ledger: [], rewards: [],
+  perks: [], myPerks: [], saved: [], votes: [], flags: [], checkins: [],
+});
+
+export let state = empty();
+
+function loadDemo(role) {
+  let s = null;
   try {
-    const s = JSON.parse(localStorage.getItem(KEY));
-    if (s && s.version === 1) return s;
+    s = JSON.parse(localStorage.getItem(KEY));
   } catch {}
-  return createSeed(Date.now());
+  if (!s || s.version !== 1) s = createSeed(Date.now());
+  s.meId = role === 'venue' ? 'u_owner' : 'u_me';
+  return s;
 }
 
-export let state = load();
+const savedKey = () => `nimreview:saved:${state.meId}`;
+function loadSaved() {
+  try {
+    return JSON.parse(localStorage.getItem(savedKey())) || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function initStore() {
+  const s = getSession();
+  if (!s) state = empty();
+  else if (s.mode === 'demo') state = loadDemo(s.role);
+  else await pull();
+}
+
+// reload everything the signed-in live user can see
+export async function pull() {
+  const here = state.here;
+  const data = await api('/bootstrap');
+  state = { ...empty(), ...data, here };
+  state.saved = loadSaved();
+  const meU = state.users[state.meId];
+  updateSession({ name: meU.name, nimAddress: meU.nimAddress, hasVenue: !!meU.ownsVenueIds?.length });
+}
 
 export function save() {
-  localStorage.setItem(KEY, JSON.stringify(state));
-  listeners.forEach((fn) => fn());
+  if (isLive()) localStorage.setItem(savedKey(), JSON.stringify(state.saved));
+  else localStorage.setItem(KEY, JSON.stringify(state));
 }
-export const subscribe = (fn) => (listeners.add(fn), () => listeners.delete(fn));
 
 export function resetDemo() {
+  const meId = state.meId;
   state = createSeed(Date.now());
+  state.meId = meId;
   save();
 }
 
 export const uid = (p) => p + Math.random().toString(36).slice(2, 9);
-export const me = () => state.users.u_me;
-export const owner = () => state.users.u_owner;
+export const me = () => state.users[state.meId];
+export const owner = me;
 export const venue = (id) => state.venues.find((v) => v.id === id);
-export const user = (id) => state.users[id];
+export const user = (id) => state.users[id] || { id, name: 'Guest', createdAt: Date.now(), reviewCount: 0, helpfulVotes: 0 };
 export const venueReviews = (id) => state.reviews.filter((r) => r.venueId === id && r.status !== 'rejected').sort((a, b) => (a.status === 'verified' ? 0 : 1) - (b.status === 'verified' ? 0 : 1) || b.createdAt - a.createdAt);
 export const rating = (id) => weightedRating(state.reviews.filter((r) => r.venueId === id));
 export const distanceKm = (v) => haversineMeters(state.here, v) / 1000;
+export const myVenue = () => venue(me()?.ownsVenueIds?.[0]);
 
 export function wallet() {
   state.ledger = settleLedger(state.ledger, Date.now());
@@ -48,13 +85,14 @@ export function aspectAverages(id) {
   return keys.map((k) => ({ key: k, avg: rs.length ? rs.reduce((s, r) => s + r.aspects[k], 0) / rs.length : 0 }));
 }
 
-function evalContext(venueId, now) {
+function evalContext(venueId, now, receiptPreview) {
   const venueRecent = state.reviews
     .filter((r) => r.venueId === venueId)
     .map((r) => ({ createdAt: r.createdAt, authorCreatedAt: state.users[r.authorId]?.createdAt ?? r.createdAt }));
   return {
     now,
-    receipts: state.receipts,
+    // live customers never see the venue's codes; the server sends back only the one they typed
+    receipts: isLive() ? (receiptPreview ? [receiptPreview] : []) : state.receipts,
     transactions: state.transactions,
     existingReviews: state.reviews.filter((r) => r.status !== 'rejected'),
     rewards: state.rewards,
@@ -69,18 +107,28 @@ export function evaluateDraft(draft, now = Date.now()) {
     account: me(),
     venue: v,
     proof: draft.proof,
-    ctx: evalContext(v.id, now),
+    ctx: evalContext(v.id, now, draft.receiptPreview),
   });
 }
 
-export function submitReview(draft) {
+export const checkProofLive = (venueId, proof) => api('/reviews/check-proof', { method: 'POST', body: { venueId, proof } });
+
+export async function submitReview(draft) {
+  if (isLive()) {
+    const out = await api('/reviews', {
+      method: 'POST',
+      body: { venueId: draft.venueId, rating: draft.rating, aspects: draft.aspects, text: draft.text, photos: draft.photos, composition: draft.composition, proof: draft.proof },
+    });
+    await pull();
+    return out;
+  }
   const now = Date.now();
   const result = evaluateDraft(draft, now);
   const v = venue(draft.venueId);
   const review = {
     id: uid('r_'),
     venueId: v.id,
-    authorId: 'u_me',
+    authorId: state.meId,
     rating: draft.rating,
     aspects: draft.aspects,
     text: draft.text.trim(),
@@ -102,13 +150,17 @@ export function submitReview(draft) {
   }
   if (result.rewardable) {
     state.ledger.unshift({ id: uid('l_'), type: 'reward', reviewId: review.id, venueId: v.id, label: `Review · ${v.name}`, amount: result.reward.amount, status: 'pending', at: now, releaseAt: result.reward.releaseAt });
-    state.rewards.push({ accountId: 'u_me', venueId: v.id, at: now });
+    state.rewards.push({ accountId: state.meId, venueId: v.id, at: now });
   }
   save();
   return { review, result };
 }
 
-export function toggleHelpful(reviewId) {
+export async function toggleHelpful(reviewId) {
+  if (isLive()) {
+    await api(`/reviews/${reviewId}/helpful`, { method: 'POST' });
+    return pull();
+  }
   const r = state.reviews.find((x) => x.id === reviewId);
   const i = state.votes.indexOf(reviewId);
   if (i >= 0) {
@@ -121,8 +173,12 @@ export function toggleHelpful(reviewId) {
   save();
 }
 
-export function flagReview(reviewId, reason, by) {
-  state.flags.push({ reviewId, reason, by, at: Date.now() });
+export async function flagReview(reviewId, reason) {
+  if (isLive()) {
+    await api(`/reviews/${reviewId}/flag`, { method: 'POST', body: { reason } });
+    return pull();
+  }
+  state.flags.push({ reviewId, reason, by: state.meId, at: Date.now() });
   save();
 }
 
@@ -132,7 +188,12 @@ export function toggleSaved(venueId) {
   save();
 }
 
-export function issueReceipt(venueId, amount, label) {
+export async function issueReceipt(venueId, amount, label) {
+  if (isLive()) {
+    const { bill } = await api('/bills', { method: 'POST', body: { amount, label } });
+    await pull();
+    return bill;
+  }
   const bytes = crypto.getRandomValues(new Uint8Array(10));
   const rec = { code: makeReceiptCode(bytes), venueId, amount: Number(amount), issuedAt: Date.now(), label: label || '' };
   state.receipts.unshift(rec);
@@ -140,10 +201,44 @@ export function issueReceipt(venueId, amount, label) {
   return rec;
 }
 
-export function replyToReview(reviewId, text) {
+export async function replyToReview(reviewId, text) {
+  if (isLive()) {
+    await api(`/reviews/${reviewId}/reply`, { method: 'POST', body: { text } });
+    return pull();
+  }
   const r = state.reviews.find((x) => x.id === reviewId);
   r.ownerReply = { text: text.trim(), at: Date.now() };
   save();
+}
+
+// NIM a venue funds per rewarded review (scaled by the genuineness score)
+export async function setReward(venueId, amount) {
+  if (isLive()) {
+    await api('/venues/mine', { method: 'PUT', body: { rewardPerReview: amount } });
+    return pull();
+  }
+  venue(venueId).rewardPerReview = amount;
+  save();
+}
+
+// demo venue accounts can try the dashboard as a restaurant, café or hotel
+export function switchDemoVenue(venueId) {
+  const o = me();
+  for (const v of state.venues) if (v.ownerId === o.id) delete v.ownerId;
+  venue(venueId).ownerId = o.id;
+  o.ownsVenueIds = [venueId];
+  save();
+}
+
+export async function saveListing(fields, isNew) {
+  await api(isNew ? '/venues' : '/venues/mine', { method: isNew ? 'POST' : 'PUT', body: fields });
+  return pull();
+}
+
+export async function connectWallet(address, label) {
+  const out = await api('/me/wallet', { method: 'PUT', body: { address, label } });
+  updateSession({ nimAddress: out.nimAddress });
+  return pull();
 }
 
 export function claimPerk(perkId) {
@@ -157,8 +252,13 @@ export function claimPerk(perkId) {
   return { ok: true, mine };
 }
 
-export function cashOut(amount, address) {
+export async function cashOut(amount, address) {
   if (amount <= 0 || amount > wallet().claimable) return { ok: false, reason: 'Amount exceeds claimable balance' };
+  if (isLive()) {
+    await api('/wallet/cashout', { method: 'POST', body: { amount } });
+    await pull();
+    return { ok: true };
+  }
   state.ledger.unshift({ id: uid('l_'), type: 'cashout', label: `Cash out to ${address.slice(0, 9)}…`, amount, status: 'demo', at: Date.now() });
   save();
   return { ok: true };

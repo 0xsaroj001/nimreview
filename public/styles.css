@@ -597,3 +597,32 @@ h1, h2, h3, p { margin: 0; }
   .layers { grid-template-columns: 1fr 1fr; }
   .layers .layer.dark { grid-column: 1 / -1; }
 }
+
+/* ---------- accounts: sign-in, wallet, listing, role isolation ---------- */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+body:not([data-role='customer']) [data-for='customer'],
+body:not([data-role='venue']) [data-for='venue'],
+body[data-role='none'] [data-for='signed-in'],
+body:not([data-mode='live']) [data-live-only] { display: none !important; }
+body[data-role='none'] .sitebar { display: none; }
+.auth { display: grid; gap: 22px; padding: calc(22px + var(--safe-t)) var(--gutter) 40px; max-width: 1080px; margin: 0 auto; }
+.auth-hero .logo { font-size: 24px; }
+.auth-hero h1 { font-family: var(--serif); font-size: clamp(32px, 7vw, 54px); line-height: 1.02; letter-spacing: -0.02em; margin-top: 22px; }
+.auth-hero h1 em { color: var(--paprika); }
+.auth-hero > p { margin-top: 14px; color: var(--ink-2); font-size: 15.5px; line-height: 1.5; max-width: 46ch; }
+.demo-box { margin-top: 22px; padding: 18px; display: grid; gap: 8px; border: 1.5px dashed #e7c55c; background: var(--gold-soft); box-shadow: none; }
+.demo-btns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; margin-top: 4px; }
+.auth-card { padding: 18px; display: grid; gap: 14px; align-self: start; }
+.auth-tabs { padding: 0; }
+.auth-form, .listing-form, .connect-card { display: grid; gap: 10px; }
+.listing-form, .connect-card { margin: 16px var(--gutter) 0; padding: 18px; }
+.listing-form .chip { cursor: pointer; }
+.form-2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.field select { flex: 1; min-width: 0; border: 0; outline: none; background: none; font: inherit; font-weight: 700; }
+.reward-set { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; margin-top: 12px; }
+.demo-switch { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 0; padding: 0 var(--gutter); }
+@media (max-width: 380px) { .demo-btns, .form-2 { grid-template-columns: minmax(0, 1fr); } }
+@media (min-width: 960px) {
+  .auth { grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); gap: 56px; padding-top: 64px; align-items: start; }
+  .auth-card { padding: 26px; }
+}

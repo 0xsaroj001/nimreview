@@ -1,11 +1,12 @@
-import { state, venue, me, distanceKm, evaluateDraft, submitReview, recordCheckin } from '../store.js';
-import { esc, icon, km, TYPE_LABEL, toast, dHash } from '../ui.js';
+import { state, venue, me, distanceKm, evaluateDraft, submitReview, recordCheckin, checkProofLive } from '../store.js';
+import { esc, icon, km, TYPE_LABEL, toast, dHash, bgImg } from '../ui.js';
 import { verifyProof, POLICY } from '../core/genuine.js';
 import { formatNim } from '../core/nimiq.js';
+import { isLive } from '../session.js';
 
 let d = null;
 const fresh = (venueId) => ({
-  venueId, step: 1, method: null, proof: { method: 'none' }, proofResult: null,
+  venueId, step: 1, method: null, proof: { method: 'none' }, proofResult: null, receiptPreview: null,
   rating: 0, aspects: { food: 0, service: 0, ambience: 0, value: 0 }, text: '',
   composition: { composeMs: 0, typedChars: 0, pastedChars: 0 }, startedAt: null, photos: [], outcome: null,
 });
@@ -23,7 +24,7 @@ function picker() {
       <div class="titlebar"><a class="icon-btn" href="#/" aria-label="Close">${icon('x')}</a><h1>New review</h1><span></span></div>
       <div class="page-head"><h2>Where did you <em>go?</em></h2><p>Pick the place you visited. Next you prove the visit, then write.</p></div>
       <div class="list" style="margin-top:12px;grid-template-columns:minmax(0,1fr)">
-        ${items.map(({ v, d }, i) => `<a class="lrow" href="#/write/${v.id}"><span class="num">${String(i + 1).padStart(2, '0')}</span><div class="thumb" style="background-image:url('${v.img.replace('w=900', 'w=300')}')"></div><div class="grow"><h3 class="ellipsis">${esc(v.name)}</h3><div class="meta">${TYPE_LABEL[v.type]} · ${esc(v.cuisine)}</div></div><span class="dist">${km(d)}</span></a>`).join('')}
+        ${items.map(({ v, d }, i) => `<a class="lrow" href="#/write/${v.id}"><span class="num">${String(i + 1).padStart(2, '0')}</span><div class="thumb" style="${bgImg(v.img, 300)}"></div><div class="grow"><h3 class="ellipsis">${esc(v.name)}</h3><div class="meta">${TYPE_LABEL[v.type]} · ${esc(v.cuisine)}</div></div><span class="dist">${km(d)}</span></a>`).join('')}
       </div>
     </div>`,
   };
@@ -42,7 +43,7 @@ function proofForm(p, v) {
     return `<div class="form">
       <label class="field">${icon('receipt')}<input id="code" placeholder="e.g. K7Q2M-9XH4T" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" value="${esc(d.proof.method === 'receipt' ? d.proof.code : '')}"></label>
       <button class="btn sm" data-verify="receipt">Check code</button>
-      <div class="hint">${demo ? `Demo: <button data-demo-code="${demo.code}">use today's bill code</button> or issue one in the owner view.` : 'Demo: issue a code for this venue in the owner view.'}</div>
+      <div class="hint">${isLive() ? 'Printed on your bill by the venue. Each code works for one review only.' : demo ? `Demo: <button data-demo-code="${demo.code}">use today's bill code</button> or issue one from the venue demo.` : 'Demo: issue a code for this venue from the venue demo on the first screen.'}</div>
     </div>`;
   }
   if (p.id === 'payment') {
@@ -71,7 +72,7 @@ function step1() {
   return `
     <div class="page-head"><h2>First, prove you <em>were there.</em></h2><p>Only proven visits earn NIM. You can still post without proof; it shows as unverified.</p></div>
     <div class="proofs">
-      ${PROOFS.map((p) => `
+      ${PROOFS.filter((p) => !isLive() || p.id === 'receipt').map((p) => `
         <div class="proof ${d.method === p.id ? 'on' : ''}" data-method="${p.id}" role="button" tabindex="0">
           <span class="ic ${p.sc}">${icon(p.icon)}</span>
           <div class="grow">
@@ -118,7 +119,7 @@ function promptsHtml(v) {
 
 const starButtons = (value, attr) => [1, 2, 3, 4, 5].map((n) => `<button class="${n <= value ? 'on' : ''}" ${attr}="${n}" aria-label="${n} star${n > 1 ? 's' : ''}">${icon('star')}</button>`).join('');
 
-const photosHtml = () => `${d.photos.map((p, i) => `<div class="ph" style="background-image:url('${p.url}')"><button data-rm="${i}" aria-label="Remove photo">${icon('x')}</button></div>`).join('')}
+const photosHtml = () => `${d.photos.map((p, i) => `<div class="ph" style="${bgImg(p.url)}"><button data-rm="${i}" aria-label="Remove photo">${icon('x')}</button></div>`).join('')}
     ${d.photos.length < 3 ? `<label class="add">${icon('camera')}Add photo<input type="file" accept="image/*" id="file" hidden></label>` : ''}`;
 
 function step2() {
@@ -201,7 +202,7 @@ export function writeView({ id, entering = false }) {
       <h1>${d.step === 3 ? 'Your receipt' : `Step ${d.step} of 2`}</h1><span></span>
     </div>
     ${d.step < 3 ? `<div class="steps" aria-hidden="true"><i class="on"></i><i class="${d.step >= 2 ? 'on' : ''}"></i></div>
-    <div class="w-venue"><div class="thumb" style="background-image:url('${v.img.replace('w=900', 'w=200')}')"></div><div class="grow"><b class="ellipsis">${esc(v.name)}</b><div class="small muted ellipsis">${esc(v.cuisine)} · ${esc(v.address)}</div></div></div>` : ''}
+    <div class="w-venue"><div class="thumb" style="${bgImg(v.img, 200)}"></div><div class="grow"><b class="ellipsis">${esc(v.name)}</b><div class="small muted ellipsis">${esc(v.cuisine)} · ${esc(v.address)}</div></div></div>` : ''}
     ${body}
   </div>`;
 
@@ -232,7 +233,13 @@ export function writeView({ id, entering = false }) {
   return { html, mount, tabs: false };
 }
 
-const check = (v) => verifyProof(d.proof, { venue: v, account: me(), now: Date.now(), receipts: state.receipts, transactions: state.transactions });
+// demo checks locally; live asks the server, which holds the venue's codes
+async function check(v) {
+  if (!isLive()) return verifyProof(d.proof, { venue: v, account: me(), now: Date.now(), receipts: state.receipts, transactions: state.transactions });
+  const { result, receipt } = await checkProofLive(v.id, d.proof);
+  d.receiptPreview = receipt;
+  return result;
+}
 
 function mountStep1(root, v, rerender) {
   root.querySelectorAll('[data-method]').forEach((el) => {
@@ -253,9 +260,14 @@ function mountStep1(root, v, rerender) {
     root.querySelector('#verdict').innerHTML = verdict(res);
     root.querySelector('[data-next]').disabled = !canContinue();
   };
-  const verifyWith = (proof) => {
+  const verifyWith = async (proof) => {
     d.proof = proof;
-    show(check(v));
+    d.receiptPreview = null;
+    try {
+      show(await check(v));
+    } catch (x) {
+      show({ ok: false, detail: x.message });
+    }
   };
   root.querySelector('[data-verify="receipt"]')?.addEventListener('click', () => verifyWith({ method: 'receipt', code: root.querySelector('#code').value }));
   root.querySelector('#code')?.addEventListener('keydown', (e) => e.key === 'Enter' && verifyWith({ method: 'receipt', code: e.target.value }));
@@ -361,9 +373,16 @@ function mountStep2(root, v) {
     refresh();
   });
 
-  submit.addEventListener('click', () => {
+  submit.addEventListener('click', async () => {
     d.composition.composeMs = d.startedAt ? Date.now() - d.startedAt : 0;
-    d.outcome = submitReview(d);
+    submit.disabled = true;
+    try {
+      d.outcome = await submitReview(d);
+    } catch (x) {
+      toast(esc(x.message));
+      submit.disabled = false;
+      return;
+    }
     d.step = 3;
     if (d.outcome.result.rewardable) toast(`${icon('hex')} +${formatNim(d.outcome.result.reward.amount)} NIM pending`);
     navigator.vibrate?.([10, 40, 10]);

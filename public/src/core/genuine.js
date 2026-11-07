@@ -337,6 +337,9 @@ export function findDuplicates(text, photoHashes = [], existing = []) {
 
 // ---------- the decision ----------
 
+// NIM paid for a perfect score at this venue. Venues set their own amount; the stars never change it.
+export const venueReward = (venue) => (Number.isFinite(venue?.rewardPerReview) ? Math.max(0, venue.rewardPerReview) : POLICY.baseReward);
+
 /**
  * @param {object} p
  * @param {{text:string, rating?:number, photoHashes?:string[], composition?:object}} p.review  rating is ignored on purpose
@@ -373,11 +376,13 @@ export function evaluateReview({ review, account, venue, proof, ctx }) {
   if (score < POLICY.minRewardScore) blockers.push(`Genuineness ${score}/100 is under the ${POLICY.minRewardScore} needed to earn`);
   blockers.push(...limits.reasons);
   if (burst.frozen) blockers.push('Rewards at this venue are paused while unusual review activity is checked');
+  const base = venueReward(venue);
+  if (!base) blockers.push('This venue does not fund review rewards');
 
   const status = hard.length ? 'rejected' : p.ok ? 'verified' : 'unverified';
   const rewardable = blockers.length === 0;
   const vestDays = POLICY.vestDays[t.tier];
-  const amount = rewardable ? round1((POLICY.baseReward * score) / 100) : 0;
+  const amount = rewardable ? round1((base * score) / 100) : 0;
 
   const W = POLICY.weights;
   const state = (ok, warn) => (ok ? 'pass' : warn ? 'warn' : 'fail');

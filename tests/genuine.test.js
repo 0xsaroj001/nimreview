@@ -4,8 +4,8 @@ import {
   POLICY, evaluateReview, similarity, verifyReceipt, verifyPayment, verifyCheckin, analyzeContent,
   analyzeComposition, accountTrust, venueBurst, settleLedger, balances, weightedRating, makeReceiptCode,
   normalizeCode, hamming,
-} from '../src/core/genuine.js';
-import { isValidAddress, makeAddress } from '../src/core/nimiq.js';
+} from '../public/src/core/genuine.js';
+import { isValidAddress, makeAddress } from '../public/src/core/nimiq.js';
 
 const DAY = 864e5;
 const now = Date.UTC(2026, 10, 5, 12);

@@ -1,6 +1,7 @@
 import { state, wallet, me, cashOut, daysLeft } from '../store.js';
 import { esc, icon, timeAgo, openSheet, closeSheet, toast, copy } from '../ui.js';
 import { formatNim, isValidAddress, formatAddress, shortAddress } from '../core/nimiq.js';
+import { isLive } from '../session.js';
 
 const KIND = {
   reward: { icon: 'edit', bg: 'var(--sage-soft)', c: 'var(--sage)' },
@@ -38,10 +39,11 @@ export function walletView() {
         <section class="section">
           <div class="section-h"><h2>Activity</h2></div>
           <div class="card ledger">
+            ${state.ledger.length ? '' : `<div class="empty">${icon('edit')}No activity yet. Proven reviews earn NIM here.</div>`}
             ${state.ledger.slice().sort((a, c) => c.at - a.at).map((e) => {
               const k = KIND[e.type];
               const plus = e.type === 'reward';
-              const status = plus ? { pending: 'Unlocking', claimable: 'Claimable', voided: 'Cancelled' }[e.status] : e.type === 'cashout' ? 'Demo, nothing sent' : 'Redeemed';
+              const status = plus ? { pending: 'Unlocking', claimable: 'Claimable', voided: 'Cancelled' }[e.status] : e.type === 'cashout' ? (e.status === 'requested' ? 'Requested, not sent on-chain yet' : 'Demo, nothing sent') : 'Redeemed';
               return `<div class="tx"><span class="ic" style="background:${k.bg};color:${k.c}">${icon(k.icon)}</span>
                 <div class="grow"><b class="ellipsis">${esc(e.label)}</b><span class="tiny muted">${timeAgo(e.at)} · ${status}</span></div>
                 <span class="amt ${plus ? (e.status === 'voided' ? 'void' : 'plus') : ''}">${plus ? '+' : '−'}${formatNim(e.amount)}</span></div>`;
@@ -57,8 +59,8 @@ export function walletView() {
     root.querySelector('[data-addr]').addEventListener('click', () =>
       openSheet(
         `<h2>Your NIM address</h2><p class="lead">Cash-outs are paid to this address.</p>
-         <div class="coupon-big"><span class="tiny muted">Demo wallet</span><code style="font-size:16px;letter-spacing:.04em">${esc(formatAddress(me().nimAddress))}</code></div>
-         <div class="stack"><button class="btn block" data-copy>${icon('copy')}Copy address</button><button class="btn block soft" data-close>Done</button></div>`,
+         <div class="coupon-big"><span class="tiny muted">${isLive() ? 'Connected wallet' : 'Demo wallet'}</span><code style="font-size:16px;letter-spacing:.04em">${esc(formatAddress(me().nimAddress))}</code></div>
+         <div class="stack"><button class="btn block" data-copy>${icon('copy')}Copy address</button>${isLive() ? `<a class="btn block ghost" href="#/connect">${icon('switch')}Change wallet</a>` : ''}<button class="btn block soft" data-close>Done</button></div>`,
         (p) => p.querySelector('[data-copy]').addEventListener('click', () => copy(formatAddress(me().nimAddress))),
       ),
     );
@@ -73,9 +75,9 @@ export function cashOutSheet(done) {
      <p class="lead">Send claimable NIM to any Nimiq wallet. Rewards still unlocking can't be cashed out yet.</p>
      <div class="stack">
        <label class="field">${icon('hex')}<input id="amt" class="plain" type="number" inputmode="decimal" min="1" step="0.1" max="${b.claimable}" value="${b.claimable}" aria-label="Amount"><span class="small muted">of ${formatNim(b.claimable)}</span></label>
-       <label class="field">${icon('wallet')}<input id="addr" value="${esc(formatAddress(me().nimAddress))}" aria-label="Nimiq address" autocomplete="off" spellcheck="false" style="font-size:13px"></label>
-       <div id="addr-state" class="verdict ok">${icon('check')}<span>Valid Nimiq address</span></div>
-       <div class="verdict warn">${icon('info')}<span>Demo build: no NIM moves. In production the rewards treasury signs and sends this payout on-chain.</span></div>
+       <label class="field">${icon('wallet')}<input id="addr" value="${esc(formatAddress(me().nimAddress))}" aria-label="Nimiq address" autocomplete="off" spellcheck="false" style="font-size:13px" ${isLive() ? 'readonly' : ''}></label>
+       <div id="addr-state" class="verdict ok">${icon('check')}<span>${isLive() ? 'Your connected wallet' : 'Valid Nimiq address'}</span></div>
+       <div class="verdict warn">${icon('info')}<span>${isLive() ? 'This records a payout request to your connected wallet. Sending NIM on-chain is not built yet, so nothing arrives in your wallet today.' : 'Demo: no NIM moves. In production the rewards treasury signs and sends this payout on-chain.'}</span></div>
        <button class="btn block gold" data-go>Cash out</button>
        <button class="btn block soft" data-close>Cancel</button>
      </div>`,
@@ -89,12 +91,19 @@ export function cashOutSheet(done) {
         st.innerHTML = `${icon(ok ? 'check' : 'alert')}<span>${ok ? 'Valid Nimiq address' : 'Not a valid Nimiq address (format or checksum)'}</span>`;
         go.disabled = !ok;
       });
-      go.addEventListener('click', () => {
+      go.addEventListener('click', async () => {
         const amt = Math.round(Number(p.querySelector('#amt').value) * 10) / 10;
-        const r = cashOut(amt, formatAddress(addr.value));
+        go.disabled = true;
+        let r;
+        try {
+          r = await cashOut(amt, formatAddress(addr.value));
+        } catch (x) {
+          r = { ok: false, reason: esc(x.message) };
+        }
+        go.disabled = false;
         if (!r.ok) return toast(r.reason);
         closeSheet();
-        toast(`${icon('check')} ${formatNim(amt)} NIM to ${esc(shortAddress(addr.value))} (demo)`);
+        toast(`${icon('check')} ${formatNim(amt)} NIM to ${esc(shortAddress(addr.value))} (${isLive() ? 'requested' : 'demo'})`);
         setTimeout(done, 300);
       });
     },

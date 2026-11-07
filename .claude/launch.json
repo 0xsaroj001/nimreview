@@ -4,7 +4,7 @@
     {
       "name": "nimreview",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["serve.mjs"],
+      "runtimeArgs": ["server.js"],
       "port": 5173
     }
   ]

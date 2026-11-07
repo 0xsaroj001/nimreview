@@ -1,6 +1,6 @@
 import { state, venue, venueReviews, rating, aspectAverages, distanceKm, user, toggleHelpful, flagReview, toggleSaved } from '../store.js';
-import { esc, icon, stars, avatar, proofLine, timeAgo, km, TYPE_LABEL, priceLevel, openSheet, closeSheet, toast } from '../ui.js';
-import { accountTrust, POLICY } from '../core/genuine.js';
+import { esc, icon, stars, avatar, proofLine, timeAgo, km, TYPE_LABEL, priceLevel, openSheet, closeSheet, toast, bgImg } from '../ui.js';
+import { accountTrust, POLICY, venueReward } from '../core/genuine.js';
 
 const filters = { v: 'all' };
 
@@ -9,7 +9,7 @@ export function reviewCard(r, { ownerView = false } = {}) {
   const tier = accountTrust(a, Date.now()).tier;
   const voted = state.votes.includes(r.id);
   const flagged = state.flags.some((f) => f.reviewId === r.id);
-  const mine = r.authorId === 'u_me';
+  const mine = r.authorId === state.meId;
   return `
   <article class="review card ${r.status === 'unverified' ? 'unverified' : ''}">
     <div class="who">
@@ -20,7 +20,7 @@ export function reviewCard(r, { ownerView = false } = {}) {
       </div>
     </div>
     <p class="text">${esc(r.text)}</p>
-    ${r.photos?.length ? `<div class="photos">${r.photos.map((p) => `<span style="background-image:url('${esc(p)}')"></span>`).join('')}</div>` : ''}
+    ${r.photos?.length ? `<div class="photos">${r.photos.map((p) => `<span style="${bgImg(p)}"></span>`).join('')}</div>` : ''}
     ${r.ownerReply ? `<div class="owner-reply"><b>${icon('store')}Owner replied · ${timeAgo(r.ownerReply.at)}</b>${esc(r.ownerReply.text)}</div>` : ''}
     ${proofLine(r.method)}
     <div class="foot">
@@ -55,7 +55,7 @@ export function venueView({ id }) {
 
   const html = `
   <div class="page venue">
-    <div class="v-hero" style="background-image:url('${v.img.replace('w=900', 'w=1600')}')">
+    <div class="v-hero" style="${bgImg(v.img, 1600)}">
       <div class="bar">
         <button class="icon-btn glass" data-back aria-label="Back">${icon('back')}</button>
         <div class="row">
@@ -90,7 +90,7 @@ export function venueView({ id }) {
           <div class="trust-note">${icon('shield')}<span>${r.verified} proven visits count fully; ${r.unverified} unverified count ${POLICY.unverifiedWeight * 100}%. Reviewers earn the same for every star.</span></div>
         </section>
         ${perk ? `<a class="perk-strip" href="#/perks"><span class="ic">${icon('gift')}</span><span class="grow"><b>${esc(perk.title)}</b><span>Claim with ${perk.cost} NIM in Perks</span></span>${icon('chevron-right')}</a>` : ''}
-        <div class="cta-bar"><div class="inner"><a class="btn block" href="#/write/${v.id}">${icon('edit')}Review this place · earn up to <span class="nim">${icon('hex')}${POLICY.baseReward}</span></a></div></div>
+        <div class="cta-bar"><div class="inner"><a class="btn block" href="#/write/${v.id}">${icon('edit')}Review this place · earn up to <span class="nim">${icon('hex')}${venueReward(v)}</span></a></div></div>
       </aside>
       <section class="v-main">
         <div class="rv-head"><h2>${r.total} <em>reviews</em></h2><a class="link" href="#/trust">How we verify</a></div>
@@ -125,8 +125,13 @@ export function venueView({ id }) {
     root.querySelector('#reviews').addEventListener('click', (e) => {
       const h = e.target.closest('[data-helpful]');
       if (h) {
-        toggleHelpful(h.dataset.helpful);
-        root.querySelector('#reviews').innerHTML = reviewsHtml(id);
+        h.disabled = true;
+        toggleHelpful(h.dataset.helpful)
+          .then(() => (root.querySelector('#reviews').innerHTML = reviewsHtml(id)))
+          .catch((x) => {
+            toast(esc(x.message));
+            h.disabled = false;
+          });
         return;
       }
       const f = e.target.closest('[data-flag]');
@@ -136,7 +141,7 @@ export function venueView({ id }) {
   return { html, mount, tabs: false };
 }
 
-export function reportSheet(reviewId, done, by = 'u_me') {
+export function reportSheet(reviewId, done) {
   const reasons = ['Not a real visit', 'Copied or generic text', 'Paid or pushed by the venue', 'Offensive or personal attack', 'Wrong venue'];
   openSheet(
     `<h2>Report this review</h2>
@@ -144,11 +149,15 @@ export function reportSheet(reviewId, done, by = 'u_me') {
      <div class="stack">${reasons.map((r, i) => `<label class="radio"><input type="radio" name="reason" value="${esc(r)}" ${i === 0 ? 'checked' : ''}>${esc(r)}</label>`).join('')}</div>
      <div class="stack"><button class="btn block" data-send>Send report</button><button class="btn block soft" data-close>Cancel</button></div>`,
     (panel) =>
-      panel.querySelector('[data-send]').addEventListener('click', () => {
-        flagReview(reviewId, panel.querySelector('input[name=reason]:checked').value, by);
-        closeSheet();
-        toast(`${icon('flag')} Report sent to moderation`);
-        done?.();
+      panel.querySelector('[data-send]').addEventListener('click', async () => {
+        try {
+          await flagReview(reviewId, panel.querySelector('input[name=reason]:checked').value);
+          closeSheet();
+          toast(`${icon('flag')} Report sent to moderation`);
+          done?.();
+        } catch (x) {
+          toast(esc(x.message));
+        }
       }),
   );
 }
