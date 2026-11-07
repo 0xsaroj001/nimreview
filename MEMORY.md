@@ -4,8 +4,10 @@
 
 Written **2026-11-07 ~19:25 UTC (2026-11-08 ~00:55 IST)**.
 
-- **Where:** worktree `.claude/worktrees/untitled-a19f37`, branch `claude/untitled-a19f37`, base `ba8440a`.
-  **Everything below is uncommitted** (owner has not asked for a commit). `origin` = github.com/Harshyadav442277/nimreview.
+- **Where:** worktree `.claude/worktrees/untitled-a19f37`, branch `claude/untitled-a19f37`, not pushed.
+  Commit `d9ccf34` (owner asked, 2026-11-07) holds the backend, accounts and the first XSS fix; production was
+  deployed from that same content. **Uncommitted and not deployed:** the second XSS fix and the two race fixes
+  (G19, G20), see the log. `origin` = github.com/Harshyadav442277/nimreview.
 - **State:** Express + MongoDB MVC backend built (`server.js`, `backend/`), frontend moved to `public/`.
   First screen = sign-in / sign-up / two demos (guest, venue). Live roles: customer and venue, isolated by route
   table (browser) and role middleware (API). Wallet connect required for live accounts (Hub `chooseAddress` or
@@ -67,3 +69,12 @@ Written **2026-11-07 ~19:25 UTC (2026-11-08 ~00:55 IST)**.
 - **2026-11-07 ~19:15 UTC: deployed.** Owner: "Yes, deploy". Linked the existing Vercel project, set env vars,
   preview showed `/api` 404 under the "Other" preset; added `vercel.json` `framework: express`, preview then
   healthy, promoted to production at https://nimreview.vercel.app. Smoke test 9/9 on production, smoke data deleted.
+- **2026-11-07 ~19:30 UTC: committed `d9ccf34`** on `claude/untitled-a19f37` (owner asked). No attribution trailer
+  (checked). Staged diff scanned: no `.env*`, `.vercel`, URI, JWT secret or Atlas password.
+- **2026-11-07 ~19:50 UTC: three security fixes after review, uncommitted, not deployed.**
+  (1) CSS injection: `&#39;` in a photo URL decoded to a quote inside the style attribute. `bgImg()` now
+  HTML-escapes the whole value; server refuses character references. Browser check: normal Unsplash URL still
+  loads, the `&#39;` payload stays literal (no `color:red`). (2) Payout race (G19): per-user lease. (3) Reward
+  limit race (G20): post-insert re-check, fails closed. `npm test` 23/23; both race tests fail 3/3 with their fix
+  removed (mutation check in a throwaway copy). Colluding-venue finding acknowledged, not fixed (G9/G4).
+  Next: owner's yes to commit, then redeploy production and re-run the smoke test.

@@ -15,6 +15,9 @@ function safeImageUrl(raw) {
     throw new HttpError(400, 'Photo must be an https:// image link');
   }
   if (u.protocol !== 'https:' || /["'()<>\\\s]/.test(s) || /["'()<>\\\s]/.test(u.href)) throw new HttpError(400, 'Photo must be an https:// image link');
+  // HTML character references (&#39; &#x27; &apos;) would decode into quotes inside a style attribute; plain
+  // query strings like &q=70 have no trailing ';' and are fine
+  if (/&#|&[a-z][a-z0-9]*;/i.test(s)) throw new HttpError(400, 'Photo must be an https:// image link');
   return u.href;
 }
 

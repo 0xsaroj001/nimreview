@@ -11,6 +11,8 @@ const userSchema = new mongoose.Schema(
     reviewCount: { type: Number, default: 0 },
     helpfulVotes: { type: Number, default: 0 },
     upheldFlags: { type: Number, default: 0 },
+    // short lease that serialises payout requests per user (see wallet.controller cashOut)
+    payoutLockUntil: { type: Date, default: null },
   },
   { timestamps: true },
 );

@@ -4,12 +4,15 @@ import { formatNim } from './core/nimiq.js';
 export const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
-// Image URLs from the server end up inside a style attribute, where HTML escaping is undone before CSS parses
-// them, so only plain https URLs and base64 image data are allowed through; anything else renders no image.
+// Image URLs from the server end up inside a style attribute. The browser decodes character references there
+// before CSS parses the value, so `&#39;` would turn back into a quote and close url('…'). Two guards: only plain
+// https URLs (no quotes, brackets, backslashes or whitespace) and base64 image data pass, and the whole value is
+// HTML-escaped, so every `&` (including `&q=70` in ordinary query strings) reaches CSS as a literal `&`.
+// Anything else renders no image.
 const SAFE_IMG = /^(https:\/\/[^\s"'()<>\\]+|data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+)$/;
 export function bgImg(url, width) {
   const u = width ? String(url ?? '').replace('w=900', `w=${width}`) : String(url ?? '');
-  return SAFE_IMG.test(u) ? `background-image:url('${u}')` : '';
+  return SAFE_IMG.test(u) ? esc(`background-image:url('${u}')`) : '';
 }
 
 export const icon = (name, cls = '') => `<svg class="i ${cls}" aria-hidden="true"><use href="#i-${name}"/></svg>`;

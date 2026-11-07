@@ -4,12 +4,13 @@ import { Venue } from '../models/Venue.js';
 import { BillCode } from '../models/BillCode.js';
 import { User } from '../models/User.js';
 import { LedgerEntry } from '../models/LedgerEntry.js';
-import { evaluateReview, verifyReceipt, normalizeCode } from '../../public/src/core/genuine.js';
+import { evaluateReview, verifyReceipt, normalizeCode, POLICY } from '../../public/src/core/genuine.js';
 import { HttpError } from '../middleware/error.js';
 import { venueJson, reviewJson, billJson } from '../views/serialize.js';
 
 const MAX_PHOTO_CHARS = 400_000; // a downscaled 720 px JPEG as a data URL
 const ms = (d) => new Date(d).getTime();
+const DAY = 864e5;
 
 async function findVenue(id) {
   const v = mongoose.isValidObjectId(id) ? await Venue.findById(id) : null;
@@ -130,10 +131,25 @@ export async function create(req, res) {
 
   await User.updateOne({ _id: user._id }, { $inc: { reviewCount: 1 } });
   if (result.rewardable) {
-    await LedgerEntry.create({
+    const mine = await LedgerEntry.create({
       user: user._id, type: 'reward', review: reviewId, venue: venue._id, label: `Review · ${venue.name}`,
       amount: result.reward.amount, status: 'pending', at: new Date(now), releaseAt: new Date(result.reward.releaseAt),
     });
+    // The fair-use limits were checked before this insert, so two submissions at the same moment (each with its
+    // own bill code) could both pass. Re-check against every other live reward now that ours is stored; the
+    // request that checks last always sees the other one. If both check at once both are voided: fail closed.
+    const others = await LedgerEntry.find({
+      _id: { $ne: mine._id }, user: user._id, type: 'reward', status: { $ne: 'voided' },
+      at: { $gte: new Date(now - POLICY.venueCooldownDays * DAY) },
+    }).lean();
+    const sameVenue = others.some((e) => String(e.venue) === String(venue._id));
+    const today = others.filter((e) => now - ms(e.at) < DAY).length;
+    if (sameVenue || today >= POLICY.maxRewardedPerDay) {
+      await LedgerEntry.updateOne({ _id: mine._id }, { status: 'voided' });
+      result.rewardable = false;
+      result.reward.amount = 0;
+      result.blockers.push(sameVenue ? `Already rewarded for this venue in the last ${POLICY.venueCooldownDays} days` : `Daily limit reached (${POLICY.maxRewardedPerDay} rewarded reviews a day)`);
+    }
   }
   res.status(201).json({ review: reviewJson(review), result });
 }
