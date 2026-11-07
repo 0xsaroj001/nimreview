@@ -13,6 +13,7 @@ const userSchema = new mongoose.Schema(
     upheldFlags: { type: Number, default: 0 },
     // short lease that serialises payout requests per user (see wallet.controller cashOut)
     payoutLockUntil: { type: Date, default: null },
+    payoutLockId: { type: String, default: null },
   },
   { timestamps: true },
 );

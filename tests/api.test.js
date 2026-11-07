@@ -168,6 +168,17 @@ test('live flow: venue lists, sets reward, issues a bill code; the code works fo
   assert.equal(payouts.filter((p) => p.status === 201).length, 1, JSON.stringify(payouts.map((p) => p.status)));
   const requested = (await call('/bootstrap', { token: c1 })).body.ledger.filter((e) => e.type === 'cashout');
   assert.equal(requested.reduce((s, e) => s + e.amount, 0), 10);
+  // lease semantics: a live lease held by another request is respected, an expired one can be taken over, and
+  // the lease is cleared afterwards. (A request outliving its own lease cannot be staged here; that case relies
+  // on the token-checked release in wallet.controller.)
+  const users = mongoose.connection.collection('users');
+  const c1Oid = new mongoose.Types.ObjectId(c1Id);
+  await users.updateOne({ _id: c1Oid }, { $set: { payoutLockUntil: new Date(Date.now() + 60_000), payoutLockId: 'other-request' } });
+  assert.equal((await call('/wallet/cashout', { method: 'POST', token: c1, body: { amount: 1 } })).status, 409);
+  assert.equal((await users.findOne({ _id: c1Oid })).payoutLockId, 'other-request');
+  await users.updateOne({ _id: c1Oid }, { $set: { payoutLockUntil: new Date(Date.now() - 1000) } });
+  assert.equal((await call('/wallet/cashout', { method: 'POST', token: c1, body: { amount: 1 } })).status, 400); // lease taken, balance is 0
+  assert.equal((await users.findOne({ _id: c1Oid })).payoutLockId, null);
 
   // login works, wrong password does not
   assert.equal((await call('/auth/login', { method: 'POST', body: { email: `t-${run}-customer1@example.test`, password: 'correct horse 1' } })).status, 200);

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { LedgerEntry } from '../models/LedgerEntry.js';
 import { Venue } from '../models/Venue.js';
 import { User } from '../models/User.js';
@@ -28,10 +29,12 @@ export async function cashOut(req, res) {
   if (!(amount > 0)) throw new HttpError(400, 'Enter an amount');
   // Balance check and insert must not interleave with another payout for the same user, or two requests could
   // each see the full balance. Take a 15 s lease (expires on its own if this instance dies), release it after.
+  // The lease carries a random token so a slow request can only ever release its own lease, never a newer one.
   const now = new Date();
+  const token = randomUUID();
   const lock = await User.findOneAndUpdate(
     { _id: req.user._id, $or: [{ payoutLockUntil: null }, { payoutLockUntil: { $lt: now } }] },
-    { payoutLockUntil: new Date(now.getTime() + 15_000) },
+    { payoutLockUntil: new Date(now.getTime() + 15_000), payoutLockId: token },
   );
   if (!lock) throw new HttpError(409, 'Another payout request is in progress, try again in a moment');
   try {
@@ -49,6 +52,6 @@ export async function cashOut(req, res) {
     });
     res.status(201).json({ entry: ledgerJson(entry) });
   } finally {
-    await User.updateOne({ _id: req.user._id }, { payoutLockUntil: null });
+    await User.updateOne({ _id: req.user._id, payoutLockId: token }, { payoutLockUntil: null, payoutLockId: null });
   }
 }
