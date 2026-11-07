@@ -2,12 +2,18 @@
 
 ## Now
 
-Written **2026-11-07 ~19:25 UTC (2026-11-08 ~00:55 IST)**.
+Written **2026-11-07 21:30 UTC (2026-11-08 03:00 IST)**.
 
-- **Where:** worktree `.claude/worktrees/untitled-a19f37`, branch `claude/untitled-a19f37`, not pushed.
-  Commit `d9ccf34` (owner asked, 2026-11-07) holds the backend, accounts and the first XSS fix; production was
-  deployed from that same content. **Uncommitted and not deployed:** the second XSS fix and the two race fixes
-  (G19, G20), see the log. `origin` = github.com/Harshyadav442277/nimreview.
+- **Where:** worktree `.claude/worktrees/untitled-a19f37`, branch `claude/untitled-a19f37`, **not pushed**.
+  Commits: `d9ccf34` backend + accounts + first XSS fix; `41e1857` CSS-injection fix + payout and reward races;
+  `b97dc73` token-checked payout lease (plus this MEMORY update, uncommitted). Production runs `b97dc73`.
+  `origin` = github.com/Harshyadav442277/nimreview.
+- **Production now:** https://nimreview.vercel.app = deployment `nimreview-jbmzb3avg-wukong4.vercel.app`
+  (2026-11-07 ~21:20 UTC). Smoke 11/11 PASS (adds: `&#39;` photo link → 400, normal link with `&q=70` → 200).
+  Smoke records deleted. **Live DB is not empty:** 4 real-looking accounts (3 `gmail.com`, 1 `gnail.com`, likely a
+  typo), 1 venue, 3 reviews, 2 codes, 1 ledger entry, created 19:06–19:24 UTC by someone using the live app (not by
+  Claude: no test-pattern emails). Left untouched. One deploy attempt failed with a transient "fetch failed"
+  (nothing deployed); the retry succeeded.
 - **State:** Express + MongoDB MVC backend built (`server.js`, `backend/`), frontend moved to `public/`.
   First screen = sign-in / sign-up / two demos (guest, venue). Live roles: customer and venue, isolated by route
   table (browser) and role middleware (API). Wallet connect required for live accounts (Hub `chooseAddress` or
@@ -23,7 +29,7 @@ Written **2026-11-07 ~19:25 UTC (2026-11-08 ~00:55 IST)**.
     signup → wallet gate → listing → code issued; customer signup → wallet → review with that code → +5.3 NIM
     pending (66 × 8 NIM). Guest `#/owner` falls back to Explore. 375 px: no horizontal overflow on the first screen.
   - `nimreview_test` dropped afterwards; live `nimreview` database has 0 users/venues/reviews/codes/ledger entries.
-- **Deployed 2026-11-07 ~19:15 UTC** from this uncommitted worktree (CLI, not git) to Vercel project
+- **First deploy 2026-11-07 ~19:15 UTC** (superseded, details kept for history) from the worktree (CLI, not git) to Vercel project
   `wukong4/nimreview` (linked in `.vercel/`, gitignored). Production: **https://nimreview.vercel.app**
   (deployment `nimreview-3gk0rz4x3-wukong4.vercel.app`). `vercel.json` sets `"framework": "express"`; without it the
   old "Other" preset deployed static files only (`/api` 404, seen on preview `nimreview-o7eoiedhm`). Node pinned 24.x.
@@ -36,12 +42,14 @@ Written **2026-11-07 ~19:25 UTC (2026-11-08 ~00:55 IST)**.
   deleted; live DB back to 0 documents. Browser: demo guest on production shows 7 venues, images, no console errors.
 - **Not verified:** real phone on the deployed URL, Nimiq Hub pop-up (`chooseAddress`) end to end in a browser
   (only the pasted-address path was exercised), production performance under load.
-- **Next action:** owner tries the live URL (sign up as venue and as guest); decide on commit/push (nothing
-  committed; a future git-connected deploy from `main` would not contain this work until it is merged).
-- **Open blockers:** G4 (no on-chain payouts / funding), G16 (wallet ownership), G18 (no rate limiting),
-  G1 (hackathon entry? then `RULES.md`), G6 (incentivised-review rules).
-- **Authorised 2026-11-07:** build the backend and deploy; owner said "Yes, deploy" to sending the Atlas URI and JWT
-  secret to Vercel (done). **Not authorised:** commits, pushes, any NIM transfer, changing Atlas network settings.
+- **Next action:** owner decides whether to push `claude/untitled-a19f37` and open a PR into `main` (a future
+  git-connected deploy from `main` would not contain this work until it is merged). Then G18 (rate limiting) is
+  the most urgent open item now that real people are signing up.
+- **Open blockers:** G4 (no on-chain payouts / funding; also gates G9 colluding venues), G16 (wallet ownership),
+  G18 (no rate limiting), G1 (hackathon entry? then `RULES.md`), G6 (incentivised-review rules).
+- **Authorised 2026-11-07:** build the backend; deploy ("Yes, deploy": env vars sent to Vercel); commit the working
+  tree; "Commit and redeploy" the security fixes (done: `41e1857`, `b97dc73`, production redeployed).
+  **Not authorised:** pushing, PRs, any NIM transfer, changing Atlas network settings, touching the real users' data.
 
 ## Log (append only)
 
@@ -78,3 +86,9 @@ Written **2026-11-07 ~19:25 UTC (2026-11-08 ~00:55 IST)**.
   limit race (G20): post-insert re-check, fails closed. `npm test` 23/23; both race tests fail 3/3 with their fix
   removed (mutation check in a throwaway copy). Colluding-venue finding acknowledged, not fixed (G9/G4).
   Next: owner's yes to commit, then redeploy production and re-run the smoke test.
+- **2026-11-07 ~21:20 UTC: committed and redeployed the security fixes** (owner: "Commit and redeploy").
+  `41e1857` = the three fixes logged above. A further commit review found the payout lease could be released
+  by a request that outlived it; `b97dc73` makes the lease token-owned (the new test covers lease semantics but
+  cannot stage the slow-request case, said so in the test). `npm test` 23/23 before each commit; secrets scan
+  clean; no attribution trailers. Production redeployed and smoke-tested 11/11; smoke data deleted. Found 4 real
+  user accounts in the live DB (not ours), left untouched.
