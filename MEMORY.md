@@ -2,15 +2,25 @@
 
 ## Now
 
-Written **2026-11-09 09:15 UTC (2026-11-09 14:45 IST)**.
+Written **2026-11-09 10:35 UTC (2026-11-09 16:05 IST)**.
 
-- **Where:** worktree `.claude/worktrees/logout-payment-fixes-0aee8e`, branch `claude/logout-payment-fixes-0aee8e`
-  (fast-forwarded to `cbfb238`), all work since then **uncommitted, not pushed, not deployed**. `.env` copied from the
-  `untitled-a19f37` worktree (gitignored). `origin/main` is still `ba8440a`. New dependency: `@noble/hashes` (Blake2b
-  for wallet addresses).
-- **Production (not touched):** https://nimreview.vercel.app, redeployed from `cbfb238` on 2026-11-08 ~19:15 UTC per the
-  other worktree's notes; not re-checked. Its live DB holds real people's email accounts (4 accounts, 1 venue as of
-  2026-11-07). **This branch cannot sign them in any more** (see G29).
+- **Where:** worktree `.claude/worktrees/logout-payment-fixes-0aee8e`, branch `claude/logout-payment-fixes-0aee8e`; the same
+  commits are on `main` (local, `Harshyadav442277/nimreview` and the private `0xsaroj001/nimreview`; the feature branch
+  was deleted on 0xsaroj001, kept locally). Code commit **`b376d3f`** (earlier: `8b0b473` wallet sign-in etc.,
+  `2afca97` review fixes). New dependency: `@noble/hashes`. `.env` copied from the `untitled-a19f37` worktree
+  (gitignored). `.vercel/` linked here (gitignored).
+- **Production (DEPLOYED 2026-11-09 ~10:28 UTC, owner: "deploy at vercel, i want the latest app everywhere"):**
+  https://nimreview.vercel.app = deployment `nimreview-nk24c5b3d-wukong4.vercel.app` (`dpl_AWuAgVWFKAj5S1WxoqzuRdpvpjow`),
+  built from `b376d3f` with `vercel deploy --prod` (CLI, not git). Smoke 16/16 PASS against the live URL: `/` 200,
+  `/api/health` connected, new owner pages / wallet sign-in / image normaliser / XSS fix served, old connect screen 404,
+  email login 404, `/api/bootstrap` 401, demo sign-in 200, challenge issued, bad signature 401, a real Ed25519 signature
+  verified on Vercel (new wallet -> setup step, NO account created), challenge reuse 401. The only write was one
+  single-use sign-in nonce record (expires after 15 min). No test accounts were created on the live DB. Env vars on
+  Vercel (Production + Preview, names only): `JWT_SECRET`, `MONGODB_DB`, `MONGODB_URI`; `NIMIQ_RPC_URL` NOT set (uses the
+  open `rpc.nimiqwatch.com`, G28). Previous production: `nimreview-hruhhnhow-wukong4` (`cbfb238`), kept by Vercel for
+  rollback (`vercel rollback`).
+- **Live DB impact (G29):** the 4 real people's email accounts and the 1 venue are untouched but cannot sign in any more.
+  The first request after deploy also drops the unique `email_1` index on `users` (`config/db.js`); not re-checked.
 - **Owner requests this session, 2026-11-09 (garbled voice-style message; my reading in brackets):**
   1. Sign in with Nimiq instead of email + password; setup asks reviewer or owner; wallet creates the account, lost
      wallet = lost account is fine. [DONE]
@@ -59,16 +69,13 @@ Written **2026-11-09 09:15 UTC (2026-11-09 14:45 IST)**.
     real Nimiq Pay uses a fourth, sign-in fails with "signature not accepted". Test on a device first.
   - Hub `signMessage` pop-up (never opened); `sendBasicTransaction` shape (`value` in Luna, per docs only).
   - A real on-chain payout end to end; real phone; production; the unauthenticated `/auth/challenge` has no rate limit.
-- **Deploy impact:** wallet sign-in replaces email + password, so existing live email accounts (and the live venue)
-  can no longer log in. The deploy also drops the unique `email_1` index on `users` (one-time, in `config/db.js`).
-  Existing live venues get cooldown 3 days. Env: optional `NIMIQ_RPC_URL` (default `https://rpc.nimiqwatch.com`, an
-  OPEN server: no uptime promise, may be throttled, requests may be logged).
-- **Next action:** owner tests sign-in inside real Nimiq Pay (Custom URL field) and reports; then decide commit /
-  deploy and what to do about the 4 existing live accounts. #3 from the earlier list (reports that do nothing, G24)
-  still needs the admin wallet address(es).
+- **Next action:** owner tests wallet sign-in inside real Nimiq Pay (Custom URL field `nimreview.vercel.app`) and reports;
+  then admin wallet address(es) for report moderation (G24) and a decision on the 4 orphaned live accounts (G29).
 - **Open blockers:** G24 (admin wallet addresses), G29 (existing live accounts), G1, G6, G18.
-- **Authorised:** the changes above (the requests). **Not authorised:** commit, push, deploy, any NIM transfer,
-  touching production data.
+- **Authorised:** the changes above, commits, pushing `main` to both GitHub repos, and the production deploy (owner's
+  words: "push this on 0xsaroj github", "merge the branch. just keep the main", "also deploy at vercel. i want the latest
+  app everywhere"). **Not authorised:** any NIM transfer, touching or deleting production data, deleting the other local
+  branches/worktrees.
 
 ## Log (append only)
 
@@ -128,3 +135,4 @@ Written **2026-11-09 09:15 UTC (2026-11-09 14:45 IST)**.
   data kept per tab. Two research subagents read nimiq.dev; their reports were treated as data (the sign() digest is
   NOT documented, hence three accepted forms).
 - **2026-11-09 ~10:00 UTC: automated review of the commit (3 findings), 2 fixed, 1 explained, uncommitted.** (1) Payout could be settled by an older unrelated payment to the same guest: now the transaction's block time must be after the request (2 min skew). (2) Legacy accounts' pasted, never-proven wallet addresses could have been matched to whoever proves that address: `walletProven` added, login and the unique index only use proven wallets (this also corrects my earlier claim that old accounts simply cannot sign in). (3) Host-header binding of the challenge: real threat class (G32) but the suggested fix does not stop a relay; not changed. `npm test` 37/37; mutation checks on both fixes fail the tests.
+- **2026-11-09 ~10:30 UTC: pushed and deployed.** `b376d3f` (escape venue names: stored-XSS review finding) committed; `main` fast-forwarded on `Harshyadav442277/nimreview` (`ba8440a` -> `b376d3f`) and `0xsaroj001/nimreview` (`2afca97` -> `b376d3f`); linked this worktree to `wukong4/nimreview`; `vercel deploy --prod` ready in ~20 s; read-only smoke 16/16. Docs commit follows (differs from the deployed build by notes only).
