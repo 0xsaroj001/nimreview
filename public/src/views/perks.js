@@ -43,7 +43,7 @@ export function perksView() {
           (panel) =>
             panel.querySelector('[data-ok]').addEventListener('click', () => {
               const r = claimPerk(p.id);
-              if (!r.ok) return toast(r.reason);
+              if (!r.ok) return toast(esc(r.reason)); // plain text that may contain a place name
               dispatchEvent(new Event('nr:refresh'));
               setTimeout(() => showCode(r.mine.id), 30);
             }),

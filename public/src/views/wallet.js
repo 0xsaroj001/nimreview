@@ -18,7 +18,7 @@ function statusOf(e) {
   const v = venue(e.venueId);
   if (e.type === 'reward') return { pending: 'Unlocking', claimable: 'Ready to cash out', voided: 'Cancelled' }[e.status];
   if (e.type === 'coupon') return 'Redeemed';
-  if (e.status === 'requested') return `Waiting for ${v?.name ?? 'the place'} to pay${isDemo() ? ' (demo: switch to the owner demo to pay it)' : ''}`;
+  if (e.status === 'requested') return `Waiting for ${esc(v?.name ?? 'the place')} to pay${isDemo() ? ' (demo: switch to the owner demo to pay it)' : ''}`;
   if (e.status === 'paid') return `Paid${e.txHash ? ` · ${shortHash(e.txHash)}` : ''}`;
   if (e.status === 'rejected') return `Declined${e.note ? `: ${esc(e.note)}` : ''}, back in your balance`;
   return '';
@@ -117,10 +117,10 @@ export function cashOutSheet(venueId, done) {
         try {
           r = await cashOut(venueId, amt);
         } catch (x) {
-          r = { ok: false, reason: esc(x.message) };
+          r = { ok: false, reason: x.message };
         }
         go.disabled = false;
-        if (!r.ok) return toast(r.reason);
+        if (!r.ok) return toast(esc(r.reason)); // reasons are plain text and may contain a place name
         closeSheet();
         toast(`${icon('check')} Asked ${esc(v.name)} to pay ${formatNim(amt)} NIM`);
         setTimeout(done, 300);
