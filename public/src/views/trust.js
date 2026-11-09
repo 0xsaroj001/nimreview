@@ -35,7 +35,7 @@ const LAYERS = [
       `${P.maxRewardedPerDay} rewarded reviews a day; one per venue every ${P.venueCooldownDays} days`,
       'Owners and staff cannot review their own venue',
       `A burst of reviews from accounts under ${P.burst.newAccountDays} days old pauses that venue's rewards`,
-      `Rewards unlock after ${P.vestDays.trusted}–${P.vestDays.new} days; an upheld report cancels them`,
+      `The place that pays you sets the wait (instant to 30 days); an upheld report cancels a reward that is still waiting`,
     ],
   },
   {

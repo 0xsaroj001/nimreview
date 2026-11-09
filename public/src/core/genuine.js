@@ -340,6 +340,7 @@ export function findDuplicates(text, photoHashes = [], existing = []) {
 // NIM paid for a perfect score at this venue. Venues set their own amount; the stars never change it.
 export const venueReward = (venue) => (Number.isFinite(venue?.rewardPerReview) ? Math.max(0, venue.rewardPerReview) : POLICY.baseReward);
 
+
 /**
  * @param {object} p
  * @param {{text:string, rating?:number, photoHashes?:string[], composition?:object}} p.review  rating is ignored on purpose
@@ -381,7 +382,9 @@ export function evaluateReview({ review, account, venue, proof, ctx }) {
 
   const status = hard.length ? 'rejected' : p.ok ? 'verified' : 'unverified';
   const rewardable = blockers.length === 0;
-  const vestDays = POLICY.vestDays[t.tier];
+  // The venue pays, so the venue sets how long a guest waits before cashing out (0 = instant). Venues that set
+  // nothing (demo data) fall back to the account-trust tiers.
+  const vestDays = Number.isFinite(venue.payoutCooldownDays) ? Math.min(30, Math.max(0, Math.round(venue.payoutCooldownDays))) : POLICY.vestDays[t.tier];
   const amount = rewardable ? round1((base * score) / 100) : 0;
 
   const W = POLICY.weights;
@@ -451,6 +454,10 @@ export function settleLedger(entries, now, voidedReviewIds = new Set()) {
   });
 }
 
+// Entries that no longer count against a balance: a rejected cash-out is refunded.
+const counts = (e) => e.status !== 'rejected';
+
+// Whole-wallet totals (header chip, profile stats).
 export function balances(entries) {
   let claimable = 0;
   let pending = 0;
@@ -460,9 +467,29 @@ export function balances(entries) {
       if (e.status === 'claimable') claimable += e.amount;
       if (e.status === 'pending') pending += e.amount;
       if (e.status !== 'voided') earned += e.amount;
-    } else {
+    } else if (counts(e)) {
       claimable -= e.amount; // coupon or cash-out
     }
   }
   return { claimable: round1(claimable), pending: round1(pending), earned: round1(earned) };
+}
+
+// The same, per venue: a venue only ever pays out what it owes. Cash-outs and perks are spent from the balance at
+// the venue they belong to. -> { [venueId]: { claimable, pending, earned } }
+export function balancesByVenue(entries) {
+  const out = {};
+  const at = (id) => (out[id] ||= { claimable: 0, pending: 0, earned: 0 });
+  for (const e of entries) {
+    if (!e.venueId) continue;
+    const b = at(e.venueId);
+    if (e.type === 'reward') {
+      if (e.status === 'claimable') b.claimable += e.amount;
+      if (e.status === 'pending') b.pending += e.amount;
+      if (e.status !== 'voided') b.earned += e.amount;
+    } else if (counts(e)) {
+      b.claimable -= e.amount;
+    }
+  }
+  for (const b of Object.values(out)) for (const k of Object.keys(b)) b[k] = round1(b[k]);
+  return out;
 }

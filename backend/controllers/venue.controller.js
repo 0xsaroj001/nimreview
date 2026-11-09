@@ -1,24 +1,16 @@
 import { Venue } from '../models/Venue.js';
 import { HttpError } from '../middleware/error.js';
 import { venueJson } from '../views/serialize.js';
+import { normalizeImageUrl } from '../../public/src/core/imageurl.js';
 
-const EDITABLE = ['name', 'type', 'cuisine', 'price', 'address', 'lat', 'lng', 'hours', 'img', 'menu', 'rewardPerReview'];
+const EDITABLE = ['name', 'type', 'cuisine', 'price', 'address', 'lat', 'lng', 'hours', 'img', 'menu', 'rewardPerReview', 'payoutCooldownDays'];
 
-// The link is rendered inside a CSS url('…') in every guest's browser, so quotes, brackets, backslashes and
-// whitespace are refused outright rather than escaped.
+// The link is rendered inside a CSS url('…') in every guest's browser. normalizeImageUrl percent-encodes quotes and
+// brackets, unwraps Google image-search and Drive links, and refuses anything that is not a plain https picture link.
 function safeImageUrl(raw) {
-  const s = String(raw).trim();
-  let u;
-  try {
-    u = new URL(s);
-  } catch {
-    throw new HttpError(400, 'Photo must be an https:// image link');
-  }
-  if (u.protocol !== 'https:' || /["'()<>\\\s]/.test(s) || /["'()<>\\\s]/.test(u.href)) throw new HttpError(400, 'Photo must be an https:// image link');
-  // HTML character references (&#39; &#x27; &apos;) would decode into quotes inside a style attribute; plain
-  // query strings like &q=70 have no trailing ';' and are fine
-  if (/&#|&[a-z][a-z0-9]*;/i.test(s)) throw new HttpError(400, 'Photo must be an https:// image link');
-  return u.href;
+  const r = normalizeImageUrl(raw);
+  if (r.error) throw new HttpError(400, r.error);
+  return r.url;
 }
 
 function pick(body) {
@@ -31,6 +23,10 @@ function pick(body) {
   if (out.img) out.img = safeImageUrl(out.img);
   for (const k of ['price', 'lat', 'lng', 'rewardPerReview']) if (out[k] !== undefined) out[k] = Number(out[k]);
   if (out.rewardPerReview !== undefined) out.rewardPerReview = Math.round(out.rewardPerReview * 10) / 10;
+  if (out.payoutCooldownDays !== undefined) {
+    out.payoutCooldownDays = Math.round(Number(out.payoutCooldownDays));
+    if (!(out.payoutCooldownDays >= 0 && out.payoutCooldownDays <= 30)) throw new HttpError(400, 'Cooldown is 0 (instant) to 30 days');
+  }
   return out;
 }
 

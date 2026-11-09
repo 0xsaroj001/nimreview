@@ -1,32 +1,27 @@
 import { randomUUID } from 'node:crypto';
+import mongoose from 'mongoose';
 import { LedgerEntry } from '../models/LedgerEntry.js';
 import { Venue } from '../models/Venue.js';
 import { User } from '../models/User.js';
-import { isValidAddress, formatAddress } from '../../public/src/core/nimiq.js';
-import { balances } from '../../public/src/core/genuine.js';
+import { balancesByVenue } from '../../public/src/core/genuine.js';
 import { HttpError } from '../middleware/error.js';
 import { ledgerJson } from '../views/serialize.js';
 
+// Rewards whose cooldown has run out become claimable (and a 0-day cooldown means instant).
 export async function settle(userId) {
   await LedgerEntry.updateMany({ user: userId, type: 'reward', status: 'pending', releaseAt: { $lte: new Date() } }, { status: 'claimable' });
 }
-
-// Stores the address the user picked in the Nimiq Hub (or typed). Checksum-validated; ownership is not proven
-// (that needs a signed message, GAPS.md G16). A venue's payout wallet follows its owner's wallet.
-export async function connectWallet(req, res) {
-  const address = String(req.body.address ?? '');
-  if (!isValidAddress(address)) throw new HttpError(400, 'Not a valid Nimiq address (format or checksum)');
-  req.user.nimAddress = formatAddress(address);
-  req.user.walletLabel = String(req.body.label ?? '').slice(0, 40);
-  await req.user.save();
-  if (req.user.role === 'venue') await Venue.updateOne({ owner: req.user._id }, { nimAddress: req.user.nimAddress });
-  res.json({ nimAddress: req.user.nimAddress, walletLabel: req.user.walletLabel });
+export async function settleVenue(venueId) {
+  await LedgerEntry.updateMany({ venue: venueId, type: 'reward', status: 'pending', releaseAt: { $lte: new Date() } }, { status: 'claimable' });
 }
 
-// Records a payout request to the connected wallet. No NIM is sent: there is no treasury signer yet (G4).
+// A guest asks one venue to pay out what that venue owes them. The venue sends the NIM from its own wallet and the
+// server confirms it on-chain (payout.controller). Nothing is paid by the server itself.
 export async function cashOut(req, res) {
   const amount = Math.round(Number(req.body.amount) * 10) / 10;
   if (!(amount > 0)) throw new HttpError(400, 'Enter an amount');
+  const venue = mongoose.isValidObjectId(req.body.venueId) ? await Venue.findById(req.body.venueId) : null;
+  if (!venue) throw new HttpError(404, 'Pick the place that owes you this reward');
   // Balance check and insert must not interleave with another payout for the same user, or two requests could
   // each see the full balance. Take a 15 s lease (expires on its own if this instance dies), release it after.
   // The lease carries a random token so a slow request can only ever release its own lease, never a newer one.
@@ -39,13 +34,14 @@ export async function cashOut(req, res) {
   if (!lock) throw new HttpError(409, 'Another payout request is in progress, try again in a moment');
   try {
     await settle(req.user._id);
-    const entries = (await LedgerEntry.find({ user: req.user._id })).map(ledgerJson);
-    const { claimable } = balances(entries);
-    if (amount > claimable) throw new HttpError(400, 'Amount exceeds claimable balance');
+    const entries = (await LedgerEntry.find({ user: req.user._id, venue: venue._id })).map(ledgerJson);
+    const claimable = balancesByVenue(entries)[String(venue._id)]?.claimable ?? 0;
+    if (amount > claimable) throw new HttpError(400, `${venue.name} owes you ${claimable} NIM that can be cashed out now`);
     const entry = await LedgerEntry.create({
       user: req.user._id,
       type: 'cashout',
-      label: `Payout request to ${req.user.nimAddress.slice(0, 9)}…`,
+      venue: venue._id,
+      label: `Cash out · ${venue.name}`,
       amount,
       status: 'requested',
       toAddress: req.user.nimAddress,

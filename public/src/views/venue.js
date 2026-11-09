@@ -89,6 +89,7 @@ export function venueView({ id }) {
           </div>
           <div class="trust-note">${icon('shield')}<span>${r.verified} proven visits count fully; ${r.unverified} unverified count ${POLICY.unverifiedWeight * 100}%. Reviewers earn the same for every star.</span></div>
         </section>
+        ${Number.isFinite(v.payoutCooldownDays) ? `<div class="trust-note">${icon('clock')}<span>${v.payoutCooldownDays === 0 ? 'Rewards here can be cashed out instantly.' : `Rewards here can be cashed out ${v.payoutCooldownDays} day${v.payoutCooldownDays === 1 ? '' : 's'} after you post.`}</span></div>` : ''}
         ${perk ? `<a class="perk-strip" href="#/perks"><span class="ic">${icon('gift')}</span><span class="grow"><b>${esc(perk.title)}</b><span>Claim with ${perk.cost} NIM in Perks</span></span>${icon('chevron-right')}</a>` : ''}
         <div class="cta-bar"><div class="inner"><a class="btn block" href="#/write/${v.id}">${icon('edit')}Review this place · earn up to <span class="nim">${icon('hex')}${venueReward(v)}</span></a></div></div>
       </aside>

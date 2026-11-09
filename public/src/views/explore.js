@@ -87,7 +87,7 @@ export function explore() {
     <a class="promo" href="#/trust">
       <span class="eyebrow">Why trust these ratings</span>
       <b>Stars never change what a reviewer earns.</b>
-      <span class="sub">Only proven visits earn, copies are refused and rewards wait before they unlock.</span>
+      <span class="sub">Only proven visits earn, copies are refused and each place sets how soon you can cash out.</span>
       <span class="link">How it works</span>
     </a>
   </div>`;

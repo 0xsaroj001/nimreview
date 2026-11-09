@@ -175,7 +175,7 @@ function step3() {
       <div class="r-rule"></div>
       <div class="r-total"><span>TOTAL</span><span class="r-stamp ${stamp[0]}">${stamp[1]}</span><b>${result.score}<span class="muted" style="font-size:16px">/100</span></b></div>
       ${result.rewardable
-        ? `<div class="r-reward">${icon('hex')}<span><b>+${formatNim(result.reward.amount)} NIM</b>Unlocks ${unlock} unless a report is upheld. Your stars did not affect this.</span></div>`
+        ? `<div class="r-reward">${icon('hex')}<span><b>+${formatNim(result.reward.amount)} NIM</b>${result.reward.vestDays === 0 ? 'Ready to cash out now.' : `Unlocks ${unlock} unless a report is upheld.`} Your stars did not affect this.</span></div>`
         : `<div class="r-reward zero">${icon('info')}<span><b>0 NIM</b>${result.status === 'rejected' ? 'Rejected reviews earn nothing.' : 'This review does not earn.'}</span></div>`}
       <div class="barcode"></div>
       <div class="r-foot">${esc(review.id.toUpperCase())}</div>
@@ -314,6 +314,8 @@ function mountStep2(root, v) {
   const refresh = () => {
     clearTimeout(t);
     t = setTimeout(() => {
+      // the draft is thrown away when the form is left, and this timer can fire just after
+      if (!d || !meter.isConnected) return;
       const r = evaluateDraft(composed());
       meter.innerHTML = meterHtml(r);
       mini.innerHTML = miniHtml(r);

@@ -1,9 +1,9 @@
 import { state, me, wallet, venue, resetDemo } from '../store.js';
-import { esc, icon, avatar, stars, methodBadge, timeAgo, toast } from '../ui.js';
-import { accountTrust, POLICY } from '../core/genuine.js';
-import { formatNim, shortAddress } from '../core/nimiq.js';
+import { esc, icon, avatar, stars, methodBadge, timeAgo, toast, copy, logoutBtn } from '../ui.js';
+import { accountTrust } from '../core/genuine.js';
+import { formatNim, shortAddress, formatAddress } from '../core/nimiq.js';
 import { resetWriteDraft } from './write.js';
-import { isLive, signOut } from '../session.js';
+import { isLive } from '../session.js';
 
 export function meView() {
   const u = me();
@@ -14,7 +14,7 @@ export function meView() {
   const next = t.tier === 'new' ? 6 : t.tier === 'regular' ? 14 : 20;
   const html = `
   <div class="page">
-    <div class="titlebar"><span></span><h1>Profile</h1><span></span></div>
+    <div class="titlebar"><span></span><h1>Profile</h1>${logoutBtn()}</div>
     <div class="two-col">
       <div class="col">
         <section class="profile">
@@ -27,15 +27,15 @@ export function meView() {
           <div class="stat"><b>${formatNim(b.earned, 0)}</b><span>NIM earned</span></div>
         </div>
         <section class="trustbar card">
-          <div class="row"><span class="tier ${t.tier}" style="margin:0">${t.tier}</span><b class="grow" style="font-size:14.5px">Account trust ${t.points}/20</b><span class="small muted">${POLICY.vestDays[t.tier]}-day unlock</span></div>
+          <div class="row"><span class="tier ${t.tier}" style="margin:0">${t.tier}</span><b class="grow" style="font-size:14.5px">Account trust ${t.points}/20</b><span class="small muted">cash-out wait set by each place</span></div>
           <div class="track"><i style="width:${(t.points / 20) * 100}%"></i></div>
-          <p class="small muted" style="margin-top:10px">${t.tier === 'trusted' ? 'Top tier: your rewards unlock fastest.' : `Reach ${next} for the next tier. Trust grows with account age, proven reviews and helpful votes; upheld reports take it away.`}</p>
+          <p class="small muted" style="margin-top:10px">${t.tier === 'trusted' ? 'Top tier: the strongest signal a place can see about you.' : `Reach ${next} for the next tier. Trust grows with account age, proven reviews and helpful votes; upheld reports take it away.`}</p>
         </section>
         <section class="section">
           <div class="card menu">
             <a href="#/trust"><span class="ic">${icon('shield')}</span>How reviews stay genuine${icon('chevron-right', 'chev')}</a>
-            ${live ? `<a href="#/connect"><span class="ic">${icon('wallet')}</span>Wallet · ${esc(shortAddress(u.nimAddress))}${icon('chevron-right', 'chev')}</a>` : `<button data-reset><span class="ic">${icon('refresh')}</span>Reset demo data${icon('chevron-right', 'chev')}</button>`}
-            <button data-logout><span class="ic">${icon('switch')}</span>${live ? 'Sign out' : 'Leave the demo'}${icon('chevron-right', 'chev')}</button>
+            ${live ? `<button data-copy-addr><span class="ic">${icon('wallet')}</span>Wallet · ${esc(shortAddress(u.nimAddress))}${icon('copy', 'chev')}</button>` : `<button data-reset><span class="ic">${icon('refresh')}</span>Reset demo data${icon('chevron-right', 'chev')}</button>`}
+            <button data-logout><span class="ic">${icon('logout')}</span>Log out${icon('chevron-right', 'chev')}</button>
           </div>
         </section>
       </div>
@@ -52,7 +52,7 @@ export function meView() {
   </div>`;
 
   function mount(root) {
-    root.querySelector('[data-logout]').addEventListener('click', signOut);
+    root.querySelector('[data-copy-addr]')?.addEventListener('click', () => copy(formatAddress(u.nimAddress)));
     root.querySelector('[data-reset]')?.addEventListener('click', () => {
       resetDemo();
       resetWriteDraft();

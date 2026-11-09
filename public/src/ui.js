@@ -15,6 +15,9 @@ export function bgImg(url, width) {
   return SAFE_IMG.test(u) ? esc(`background-image:url('${u}')`) : '';
 }
 
+// The one log out button used on every screen (wired up in app.js and in the views that render it).
+export const logoutBtn = (cls = 'm-only') => `<button class="logout-btn ${cls}" data-logout aria-label="Log out">${icon('logout')}<span>Log out</span></button>`;
+
 export const icon = (name, cls = '') => `<svg class="i ${cls}" aria-hidden="true"><use href="#i-${name}"/></svg>`;
 
 export const nim = (n, cls = '') => `<span class="nim ${cls}">${icon('hex', 'hex')}<b>${formatNim(n)}</b></span>`;
@@ -66,6 +69,8 @@ export function timeAgo(t) {
   if (d < 7) return d === 1 ? 'yesterday' : `${d} days ago`;
   return new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
+
+export const shortHash = (h) => (h ? `${String(h).slice(0, 6)}…${String(h).slice(-4)}` : '');
 
 export const km = (d) => (d < 1 ? `${Math.round(d * 1000)} m` : d < 100 ? `${d.toFixed(1)} km` : `${Math.round(d)} km`);
 

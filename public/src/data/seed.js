@@ -132,23 +132,28 @@ export function createSeed(now = Date.now()) {
     { id: 'l8', type: 'reward', reviewId: 'old7', venueId: 'lumen', label: 'Review · Lumen Bistro', amount: 22.8, status: 'claimable', at: now - 70 * DAY, releaseAt: now - 63 * DAY },
     { id: 'l9', type: 'reward', reviewId: 'old8', venueId: 'brew', label: 'Review · Brew Theory', amount: 24.1, status: 'claimable', at: now - 58 * DAY, releaseAt: now - 51 * DAY },
     { id: 'l10', type: 'reward', reviewId: 'old9', venueId: 'saffron', label: 'Review · Saffron Courtyard', amount: 20.6, status: 'claimable', at: now - 50 * DAY, releaseAt: now - 43 * DAY },
-    { id: 'l7', type: 'coupon', label: 'Perk · Free filter coffee, Nilgiri Table', amount: 40, status: 'done', at: now - 12 * DAY },
+    { id: 'l11', type: 'reward', reviewId: 'old11', venueId: 'nilgiri', label: 'Review · Nilgiri Table', amount: 21.3, status: 'claimable', at: now - 90 * DAY, releaseAt: now - 83 * DAY },
+    { id: 'l7', type: 'coupon', venueId: 'nilgiri', label: 'Perk · Free filter coffee, Nilgiri Table', amount: 12, status: 'done', at: now - 12 * DAY },
   ];
 
   // rewards history feeds the fair-use limits
   const rewards = ledger.filter((e) => e.type === 'reward').map((e) => ({ accountId: 'u_me', venueId: e.venueId, at: e.at }));
 
   const perks = [
-    { id: 'p1', venueId: 'lumen', title: '15% off dinner for two', terms: 'Sun–Thu, up to ₹600', cost: 120, tone: 'navy' },
-    { id: 'p2', venueId: 'copper', title: 'Free almond croissant', terms: 'With any coffee', cost: 45, tone: 'gold' },
-    { id: 'p3', venueId: 'saffron', title: 'Dessert on the house', terms: 'Bills over ₹800', cost: 60, tone: 'green' },
-    { id: 'p4', venueId: 'marigold', title: 'Free late checkout', terms: 'Until 2 pm, subject to availability', cost: 150, tone: 'blue' },
-    { id: 'p5', venueId: 'brew', title: 'Second pour over half price', terms: 'Weekdays before noon', cost: 50, tone: 'gold' },
-    { id: 'p6', venueId: 'nilgiri', title: 'Free filter coffee', terms: 'With any breakfast', cost: 40, tone: 'green' },
+    { id: 'p1', venueId: 'lumen', title: '15% off dinner for two', terms: 'Sun–Thu, up to ₹600', cost: 20, tone: 'navy' },
+    { id: 'p2', venueId: 'copper', title: 'Free almond croissant', terms: 'With any coffee', cost: 15, tone: 'gold' },
+    { id: 'p3', venueId: 'saffron', title: 'Dessert on the house', terms: 'Bills over ₹800', cost: 35, tone: 'green' },
+    { id: 'p4', venueId: 'marigold', title: 'Free late checkout', terms: 'Until 2 pm, subject to availability', cost: 30, tone: 'blue' },
+    { id: 'p5', venueId: 'brew', title: 'Second pour over half price', terms: 'Weekdays before noon', cost: 20, tone: 'gold' },
+    { id: 'p6', venueId: 'nilgiri', title: 'Free filter coffee', terms: 'With any breakfast', cost: 12, tone: 'green' },
   ];
 
+  // each demo venue chooses how long its guests wait before they can cash out (0 = instant)
+  const cooldown = { lumen: 3, copper: 0, saffron: 3, marigold: 7, brew: 1, nilgiri: 3 };
+  for (const v of venues) v.payoutCooldownDays = cooldown[v.id] ?? 3;
+
   return {
-    version: 1,
+    version: 2,
     seededAt: now,
     here: { ...DEMO_CENTER, real: false },
     venues, users, reviews, receipts, transactions, ledger, rewards, perks,

@@ -17,16 +17,26 @@ OneDrive, so install and run from a copy outside it if `node_modules` sync is a 
 
 ## Accounts
 
-The first screen offers sign-in, sign-up and two demos.
+**Sign in with your Nimiq wallet.** No email, no password: your wallet is your account, and losing it loses the
+account. Inside **Nimiq Pay** the app asks the wallet to sign a one-time message automatically; on a desktop browser
+the Nimiq Hub pop-up does the same. A wallet the app has not seen asks one thing: *I review places* or *I own a
+restaurant, café or hotel*. The server checks the signature, works out the address from the signing key, and never
+sees a key or seed phrase.
 
-| Account | What it gets |
-|---|---|
-| **Demo guest** / **Demo venue** | Fictional seed data and demo NIM in `localStorage`; nothing reaches the database. The two demos share one data set, so a code issued in the venue demo can be redeemed in the guest demo. The venue demo can switch between a restaurant, a café and a hotel. |
-| **Customer** (live) | Must connect a Nimiq wallet. Browses live listings, proves a visit with a bill code, writes reviews, earns NIM (recorded), requests payouts. |
-| **Venue** (live) | Must connect a Nimiq wallet, then list the place (restaurants, cafés, hotels). Sets the reward per review, issues bill codes, replies and disputes. |
+- **Reviewers** prove a visit with the bill code the owner issued, write, and earn NIM owed by that place.
+- **Owners** list their place, set the reward per review and how long a guest waits before cashing out (Instant to
+  30 days), issue single-use bill codes, answer reviews, and pay their guests' cash-out requests from their own wallet.
+- **Demo** (no wallet): reviewer or owner, fake NIM, kept for the browser tab only. Reviewer asks a place to pay, owner
+  demo pays it.
 
-Customers and venues have separate route tables in the browser and separate role checks on every API route, so
-neither can open the other's screens or call the other's endpoints.
+## Money
+
+A reward is an IOU from the place that asked for the review. When a guest cashes out, they ask *that* place; the place
+sends NIM from its own wallet (one tap in Nimiq Pay, or from any wallet plus pasting the transaction hash). The
+server marks it paid only after finding that exact transaction on the Nimiq chain (right sender, right recipient, at
+least the amount, executed, in a block). A place can decline a request and the guest gets the NIM back in their
+balance. The server never holds a key and never sends NIM itself. The chain lookup uses `NIMIQ_RPC_URL` (default
+`the open server `rpc.nimiqwatch.com`, which has no uptime promise: set your own before real use).
 
 ## Backend layout
 

@@ -4,17 +4,16 @@ import { writeView, resetWriteDraft } from './views/write.js';
 import { walletView } from './views/wallet.js';
 import { perksView } from './views/perks.js';
 import { meView } from './views/me.js';
-import { ownerView } from './views/owner.js';
+import { ownerOverview, ownerReviews, ownerCodes, ownerPayouts, ownerSettings } from './views/owner.js';
 import { trustView } from './views/trust.js';
 import { authView } from './views/auth.js';
-import { connectView } from './views/connect.js';
 import { listingView } from './views/listing.js';
 import { closeSheet, icon, toast, esc } from './ui.js';
-import { wallet, initStore } from './store.js';
+import { wallet, initStore, state } from './store.js';
 import { getSession, signOut } from './session.js';
 import { formatNim } from './core/nimiq.js';
 
-// Customers and venues get separate route tables, so neither can open the other's screens.
+// Reviewers and owners get separate route tables, so neither can open the other's screens.
 const CUSTOMER = [
   [/^\/?$/, () => explore()],
   [/^\/venue\/([\w-]+)$/, (m) => venueView({ id: m[1] })],
@@ -23,17 +22,20 @@ const CUSTOMER = [
   [/^\/perks$/, () => perksView()],
   [/^\/me$/, () => meView()],
   [/^\/trust$/, () => trustView()],
-  [/^\/connect$/, () => connectView()],
 ];
 const VENUE = [
-  [/^\/(owner)?$/, () => ownerView()],
+  [/^\/(owner)?$/, () => ownerOverview()],
+  [/^\/owner\/reviews$/, () => ownerReviews()],
+  [/^\/owner\/codes$/, () => ownerCodes()],
+  [/^\/owner\/payouts$/, () => ownerPayouts()],
+  [/^\/owner\/settings$/, () => ownerSettings()],
   [/^\/listing$/, () => listingView()],
   [/^\/trust$/, () => trustView()],
-  [/^\/connect$/, () => connectView()],
 ];
 
 const viewEl = document.getElementById('view');
 const tabbar = document.getElementById('tabbar');
+const vtabbar = document.getElementById('vtabbar');
 const siteBal = document.getElementById('site-bal');
 let lastPath = null;
 let ready = false;
@@ -41,13 +43,23 @@ let ready = false;
 function pickView(path, changed) {
   const s = getSession();
   if (!s) return authView();
-  if (s.mode === 'live' && !s.nimAddress) return connectView();
   if (s.role === 'venue' && s.mode === 'live' && !s.hasVenue) return listingView();
   for (const [re, fn] of s.role === 'venue' ? VENUE : CUSTOMER) {
     const m = path.match(re);
     if (m) return fn(m, changed);
   }
-  return s.role === 'venue' ? ownerView() : explore();
+  return s.role === 'venue' ? ownerOverview() : explore();
+}
+
+// owners see how many cash-out requests are waiting for them
+function paintPayoutBadge(s) {
+  const n = s?.role === 'venue' ? state.ledger.filter((e) => e.type === 'cashout' && e.status === 'requested').length : 0;
+  for (const id of ['payout-badge', 'payout-badge-m']) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    el.hidden = !n;
+    el.textContent = n > 9 ? '9+' : String(n);
+  }
 }
 
 function render() {
@@ -55,6 +67,8 @@ function render() {
   const s = getSession();
   const path = location.hash.replace(/^#/, '') || '/';
   const changed = path !== lastPath;
+  // Leaving the review form throws the half-written review away: coming back later starts clean.
+  if (changed && lastPath?.startsWith('/write') && !path.startsWith('/write')) resetWriteDraft();
   const view = pickView(path, changed);
 
   document.body.dataset.role = s?.role || 'none';
@@ -62,10 +76,11 @@ function render() {
   const keep = changed ? 0 : scrollY;
   viewEl.innerHTML = view.html;
   viewEl.className = `${changed ? 'view-enter' : ''} ${view.tabs === false ? 'no-tabs' : ''}`;
-  const tabs = view.tabs !== false && s?.role === 'customer';
-  tabbar.classList.toggle('hidden', !tabs);
+  tabbar.classList.toggle('hidden', !(view.tabs !== false && s?.role === 'customer'));
+  vtabbar.classList.toggle('hidden', !(view.tabs !== false && s?.role === 'venue'));
   document.querySelectorAll('[data-tab]').forEach((a) => a.classList.toggle('on', a.dataset.tab === view.tab));
   if (s?.role === 'customer') siteBal.innerHTML = `${icon('hex')}${formatNim(wallet().claimable)}`;
+  paintPayoutBadge(s);
   view.mount?.(viewEl);
   scrollTo({ top: keep, behavior: 'instant' });
   if (changed) {
@@ -91,7 +106,10 @@ async function boot() {
   render();
 }
 
-document.querySelectorAll('[data-logout]').forEach((b) => b.addEventListener('click', signOut));
+// every log out button, wherever a view renders one
+document.addEventListener('click', (e) => {
+  if (e.target.closest('[data-logout]')) signOut();
+});
 addEventListener('hashchange', render);
 addEventListener('nr:refresh', render);
 addEventListener('nr:session', boot);

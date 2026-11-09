@@ -2,54 +2,73 @@
 
 ## Now
 
-Written **2026-11-07 21:30 UTC (2026-11-08 03:00 IST)**.
+Written **2026-11-09 09:15 UTC (2026-11-09 14:45 IST)**.
 
-- **Where:** worktree `.claude/worktrees/untitled-a19f37`, branch `claude/untitled-a19f37`, **not pushed**.
-  Commits: `d9ccf34` backend + accounts + first XSS fix; `41e1857` CSS-injection fix + payout and reward races;
-  `b97dc73` token-checked payout lease (plus this MEMORY update, uncommitted). Production runs `b97dc73`.
-  `origin` = github.com/Harshyadav442277/nimreview.
-- **Production now:** https://nimreview.vercel.app = deployment `nimreview-jbmzb3avg-wukong4.vercel.app`
-  (2026-11-07 ~21:20 UTC). Smoke 11/11 PASS (adds: `&#39;` photo link → 400, normal link with `&q=70` → 200).
-  Smoke records deleted. **Live DB is not empty:** 4 real-looking accounts (3 `gmail.com`, 1 `gnail.com`, likely a
-  typo), 1 venue, 3 reviews, 2 codes, 1 ledger entry, created 19:06–19:24 UTC by someone using the live app (not by
-  Claude: no test-pattern emails). Left untouched. One deploy attempt failed with a transient "fetch failed"
-  (nothing deployed); the retry succeeded.
-- **State:** Express + MongoDB MVC backend built (`server.js`, `backend/`), frontend moved to `public/`.
-  First screen = sign-in / sign-up / two demos (guest, venue). Live roles: customer and venue, isolated by route
-  table (browser) and role middleware (API). Wallet connect required for live accounts (Hub `chooseAddress` or
-  pasted address, checksum-validated). Venues set `rewardPerReview`; bill codes are single-use (conditional update).
-- **Secrets:** `.env` (gitignored, never tracked: `git ls-files` shows none) holds `MONGODB_URI` (copied from
-  `Downloads/atlas-credentials.env`), `MONGODB_DB=nimreview`, a generated `JWT_SECRET`. The Atlas password
-  appeared once in this session's tool output when the credentials file was read; it was not written anywhere else.
-- **Verified 2026-11-07 ~18:30 UTC** (local, against Atlas):
-  - `npm test` 22/22 (23/23 after the XSS fix logged below): 21 engine tests + `tests/api.test.js` end-to-end against `nimreview_test` (signup, wallet,
-    listing, reward, bill code, one-use, concurrent race → exactly one 201 + one 409, role isolation, reply, login).
-  - Browser pane: demo venue → set 15 NIM, issued code, switched to hotel; demo guest → venue shows "earn up to
-    15", code verified, 2★ review scored 81 → +12.2 NIM, second use refused. Live (on `nimreview_test`): venue
-    signup → wallet gate → listing → code issued; customer signup → wallet → review with that code → +5.3 NIM
-    pending (66 × 8 NIM). Guest `#/owner` falls back to Explore. 375 px: no horizontal overflow on the first screen.
-  - `nimreview_test` dropped afterwards; live `nimreview` database has 0 users/venues/reviews/codes/ledger entries.
-- **First deploy 2026-11-07 ~19:15 UTC** (superseded, details kept for history) from the worktree (CLI, not git) to Vercel project
-  `wukong4/nimreview` (linked in `.vercel/`, gitignored). Production: **https://nimreview.vercel.app**
-  (deployment `nimreview-3gk0rz4x3-wukong4.vercel.app`). `vercel.json` sets `"framework": "express"`; without it the
-  old "Other" preset deployed static files only (`/api` 404, seen on preview `nimreview-o7eoiedhm`). Node pinned 24.x.
-  Env vars `MONGODB_URI`, `MONGODB_DB`, `JWT_SECRET` set as Sensitive for production + preview (piped from `.env`,
-  never printed). `vercel link` wrote `.env.local` (only `VERCEL_OIDC_TOKEN`, gitignored).
-- **Verified on production 2026-11-07 ~19:20 UTC:** `/` 200; `/api/health` → `{"ok":true,"db":"connected"}`;
-  smoke script (`node smoke.mjs <url>`, kept outside the repo) 9/9 PASS: venue signup, wallet, listing, bill code,
-  review with code → 201 verified +7.3 NIM, same code again → 409, customer issuing code → 403, venue posting
-  review → 403, unsafe photo link → 400. Smoke records (2 users, 1 venue, 1 review, 1 code, 1 ledger entry)
-  deleted; live DB back to 0 documents. Browser: demo guest on production shows 7 venues, images, no console errors.
-- **Not verified:** real phone on the deployed URL, Nimiq Hub pop-up (`chooseAddress`) end to end in a browser
-  (only the pasted-address path was exercised), production performance under load.
-- **Next action:** owner decides whether to push `claude/untitled-a19f37` and open a PR into `main` (a future
-  git-connected deploy from `main` would not contain this work until it is merged). Then G18 (rate limiting) is
-  the most urgent open item now that real people are signing up.
-- **Open blockers:** G4 (no on-chain payouts / funding; also gates G9 colluding venues), G16 (wallet ownership),
-  G18 (no rate limiting), G1 (hackathon entry? then `RULES.md`), G6 (incentivised-review rules).
-- **Authorised 2026-11-07:** build the backend; deploy ("Yes, deploy": env vars sent to Vercel); commit the working
-  tree; "Commit and redeploy" the security fixes (done: `41e1857`, `b97dc73`, production redeployed).
-  **Not authorised:** pushing, PRs, any NIM transfer, changing Atlas network settings, touching the real users' data.
+- **Where:** worktree `.claude/worktrees/logout-payment-fixes-0aee8e`, branch `claude/logout-payment-fixes-0aee8e`
+  (fast-forwarded to `cbfb238`), all work since then **uncommitted, not pushed, not deployed**. `.env` copied from the
+  `untitled-a19f37` worktree (gitignored). `origin/main` is still `ba8440a`. New dependency: `@noble/hashes` (Blake2b
+  for wallet addresses).
+- **Production (not touched):** https://nimreview.vercel.app, redeployed from `cbfb238` on 2026-11-08 ~19:15 UTC per the
+  other worktree's notes; not re-checked. Its live DB holds real people's email accounts (4 accounts, 1 venue as of
+  2026-11-07). **This branch cannot sign them in any more** (see G29).
+- **Owner requests this session, 2026-11-09 (garbled voice-style message; my reading in brackets):**
+  1. Sign in with Nimiq instead of email + password; setup asks reviewer or owner; wallet creates the account, lost
+     wallet = lost account is fine. [DONE]
+  2. Demo: a real log out button, not a cross. [DONE: labelled "Log out" + door icon everywhere; titlebar on phones,
+     header on desktop, menu rows.]
+  3. "Wallet setup will allow users to cash out as the hotel's wallet is listed." [Read as: the PLACE pays its guests
+     from its own wallet. Replaces the reward fund I built earlier; that is deleted.]
+  4. Venue sets the cooldown before a guest can cash out, with an instant option. [DONE: 0/1/3/7/14/30 days, per
+     venue, in Settings.]
+  5. Stale data when going back and forth: [Review draft is now thrown away when you leave the form; demo data lives
+     in sessionStorage (tab only); real logins stay in localStorage. DONE]
+  6. Pasted Google picture links not loading. [DONE: see below. I was not given the failing link, so the cause is
+     inferred from the usual Google shapes.]
+  7. Owner UI too crammed on one page. [DONE: Overview, Reviews, Bill codes, Payouts, Settings.]
+- **How it works now:**
+  - Sign-in: `POST /auth/challenge` -> wallet signs it (Nimiq Pay `sign()` inside the app, Hub `signMessage` pop-up
+    on desktop) -> `POST /auth/wallet` verifies the Ed25519 signature, derives the address from the public key
+    (Blake2b-256, first 20 bytes) -> known wallet: signed in; new wallet: ticket -> `POST /auth/signup` with role
+    (+ optional name). Challenge is single-use (nonce recorded), 5 min, server-held message, domain in it. No pasted-
+    address sign-in (that would let anyone be anyone).
+  - Money: reward = what the venue owes the guest (pending -> claimable after the venue's cooldown). Guest asks THAT
+    venue to pay (`POST /wallet/cashout {venueId, amount}`, per-venue balance, one 15 s lease per user). Venue pays
+    from its wallet (Nimiq Pay `sendBasicTransaction`) or sends from any wallet and pastes the hash; server looks the
+    transaction up on the chain (`backend/utils/chain.js`, public RPC) and only marks it paid if sender = venue wallet,
+    recipient = guest, value >= amount, executed, confirmed. One tx can settle one payout. Venue can decline (refund).
+  - Demo: same flow in the browser with fake NIM; reviewer asks, owner demo pays. Perks are spent from the NIM earned
+    at that place.
+- **Verified 2026-11-09 ~09:00 UTC:**
+  - `npm test` **36/36** (engine, wallet-sig, API end to end against Atlas `nimreview_test`, dropped after). Mutation
+    checks: removing the payout sender check, and removing the one-time-challenge check, each fail the tests; both
+    restored.
+  - Address derivation checked against **5 real mainnet transactions** (public key from the tx proof, address from the
+    sender; 5/5 match), one pinned as a test vector.
+  - Browser pane on a throwaway DB `nimreview_uitest` (dropped, 0 collections left), using a stand-in `window.nimiq`
+    that signs with a real Ed25519 key (SHA-256 + Nimiq prefix form): auto sign-in inside "Nimiq Pay" -> new wallet ->
+    role + name -> owner account -> listing (photo check: Google imgres link, `&amp;`, `http`, share page, dead host)
+    -> settings (reward 20, instant) -> bill code -> log out (old token 401) -> same wallet signs back in with no setup
+    -> second wallet as reviewer -> review with the code: +14.8 NIM claimable at once -> cash-out requested, balance 0 ->
+    owner payouts shows it with badge 1 -> "Pay in Nimiq Pay" sent exactly 1,480,000 Luna to the guest -> server refused
+    to mark it paid because that fake hash is not on the chain, UI shows "Check the payment". Demo flow: reviewer asks
+    Lumen for 20 (161.9 -> 141.9), owner demo pays, history shows it. Phone 375 px: no overflow on all five owner pages.
+    Desktop: top nav with Payouts badge, Settings two columns.
+- **NOT verified (important):**
+  - **Real Nimiq Pay.** What exactly `sign()` signs is undocumented (nimiq.dev, checked 2026-11-08). The server accepts
+    three forms (raw bytes, SHA-256 of "\x16Nimiq Signed Message:\n"+len+msg, and that prefixed string unhashed). If
+    real Nimiq Pay uses a fourth, sign-in fails with "signature not accepted". Test on a device first.
+  - Hub `signMessage` pop-up (never opened); `sendBasicTransaction` shape (`value` in Luna, per docs only).
+  - A real on-chain payout end to end; real phone; production; the unauthenticated `/auth/challenge` has no rate limit.
+- **Deploy impact:** wallet sign-in replaces email + password, so existing live email accounts (and the live venue)
+  can no longer log in. The deploy also drops the unique `email_1` index on `users` (one-time, in `config/db.js`).
+  Existing live venues get cooldown 3 days. Env: optional `NIMIQ_RPC_URL` (default `https://rpc.nimiqwatch.com`, an
+  OPEN server: no uptime promise, may be throttled, requests may be logged).
+- **Next action:** owner tests sign-in inside real Nimiq Pay (Custom URL field) and reports; then decide commit /
+  deploy and what to do about the 4 existing live accounts. #3 from the earlier list (reports that do nothing, G24)
+  still needs the admin wallet address(es).
+- **Open blockers:** G24 (admin wallet addresses), G29 (existing live accounts), G1, G6, G18.
+- **Authorised:** the changes above (the requests). **Not authorised:** commit, push, deploy, any NIM transfer,
+  touching production data.
 
 ## Log (append only)
 
@@ -92,3 +111,19 @@ Written **2026-11-07 21:30 UTC (2026-11-08 03:00 IST)**.
   cannot stage the slow-request case, said so in the test). `npm test` 23/23 before each commit; secrets scan
   clean; no attribution trailers. Production redeployed and smoke-tested 11/11; smoke data deleted. Found 4 real
   user accounts in the live DB (not ours), left untouched.
+- **2026-11-08 ~19:35 UTC: logout + venue reward fund (uncommitted, branch `claude/logout-payment-fixes-0aee8e`).**
+  Owner asked for logout in demo and live for guests and venues, and to fix wallet deductions. Found the worktree on
+  the stale `ba8440a`; fast-forwarded to `cbfb238`. Logout: server-side token revocation + buttons on every screen.
+  Payments: customer deductions were correct (browser check); added the missing venue-side debit (reward fund),
+  refunds on void, top-ups, guest-facing "reward fund empty". Tests 27/27; browser checks on a throwaway DB, dropped.
+- **2026-11-08 ~20:00 UTC: Nimiq Pay auto-connect + wallet red flags (uncommitted).** Owner's phone showed the Hub
+  button leaving the app. Read the Mini App docs and the `@nimiq/mini-app-sdk` 0.2.5 source (init() only waits for
+  `window.nimiq`), so the provider is called directly, no new dependency. Added one-wallet-per-account. Red flags
+  logged as G23-G26. Real Nimiq Pay test still needed.
+- **2026-11-09 ~09:15 UTC: wallet sign-in, venue-paid cash-outs, owner pages (uncommitted).** Replaced email/password
+  with Nimiq wallet sign-in (Ed25519 challenge, address derived and checked against mainnet). Deleted the reward-fund
+  work from 2026-11-08: owner's message made the venue the payer, so the money moves from the venue's wallet to the
+  guest's and the server confirms it on-chain. Cooldown is the venue's choice. Owner area split into five pages.
+  Photo links normalised (Google imgres / Drive / `&amp;` / http). Review draft discarded on leaving the form; demo
+  data kept per tab. Two research subagents read nimiq.dev; their reports were treated as data (the sign() digest is
+  NOT documented, hence three accepted forms).

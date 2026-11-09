@@ -626,3 +626,55 @@ body[data-role='none'] .sitebar { display: none; }
   .auth { grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); gap: 56px; padding-top: 64px; align-items: start; }
   .auth-card { padding: 26px; }
 }
+
+/* venue reward fund */
+.fund-top { display: flex; align-items: flex-end; gap: 12px; margin-top: 12px; }
+.fund-amt { display: flex; align-items: baseline; gap: 6px; margin-top: 4px; }
+.fund-amt .i { width: 22px; height: 22px; align-self: center; }
+.fund-amt b { font-family: var(--serif); font-size: 34px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+.fund-amt span { font-weight: 700; color: var(--muted); }
+.fund-sub { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 10px; }
+.fund-sub b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.fund-hist { margin-top: 10px; border-top: 1.5px dashed var(--line); }
+
+/* log out button, owner pages, payouts */
+.titlebar { grid-template-columns: minmax(44px, auto) 1fr minmax(44px, auto); }
+.logout-btn { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 12px 0 10px; border-radius: 14px; background: var(--card); box-shadow: var(--sh-1); font-weight: 700; font-size: 13px; color: var(--ink); white-space: nowrap; }
+.logout-btn .i { width: 17px; height: 17px; }
+.sitebar .btn .i { width: 16px; height: 16px; margin-right: 6px; }
+.dot-badge { position: absolute; top: 2px; margin-left: 14px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--paprika); color: #fff; font: 700 10px/16px var(--sans, inherit); font-style: normal; text-align: center; }
+.dot-badge[hidden] { display: none; }
+.sitebar nav a { position: relative; }
+.sitebar .dot-badge { position: static; margin-left: 6px; display: inline-block; vertical-align: middle; }
+.demo-bar { display: flex; gap: 8px; align-items: center; margin: 4px var(--gutter) 0; padding: 10px 14px; border-radius: var(--r-md); background: var(--plum-soft); color: var(--plum); font-size: 12.5px; font-weight: 700; }
+.demo-bar .i { width: 16px; height: 16px; flex: none; }
+.section.tight { margin-top: 18px; }
+.col.full { grid-column: 1 / -1; }
+.owed { display: grid; gap: 10px; padding: 12px var(--gutter) 0; }
+.owed-row { display: flex; align-items: center; gap: 10px; padding: 14px 16px; }
+.owed-row .nim { font-family: var(--serif); font-weight: 600; font-size: 18px; }
+.attn-list { display: grid; gap: 10px; padding: 12px var(--gutter) 0; }
+.attn { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: var(--r-md); background: var(--card); box-shadow: var(--sh-1); font-size: 14px; }
+.attn > .i:first-child { width: 20px; height: 20px; flex: none; color: var(--gold-deep); }
+.attn .chev { width: 18px; height: 18px; margin-left: auto; color: var(--muted); flex: none; }
+.attn.urgent { background: var(--gold-soft); box-shadow: inset 0 0 0 1.5px #e7c55c; }
+.attn.warn { background: var(--paprika-soft); color: #b13a17; font-weight: 600; }
+.owed-mini { display: block; margin: 14px var(--gutter) 0; padding: 16px; }
+.mini-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+.mini-row b { display: block; font-family: var(--serif); font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+.mini-row div { font-size: 11.5px; color: var(--muted); font-weight: 700; }
+.kpi.hot { background: var(--gold-soft); box-shadow: inset 0 0 0 1.5px #e7c55c; }
+.pay-list { display: grid; gap: 12px; padding: 0 var(--gutter); }
+.pay-req { padding: 16px; display: grid; gap: 6px; }
+.pay-req .nim { font-family: var(--serif); font-size: 20px; font-weight: 600; }
+.pay-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.pay-acts .btn { flex: 1 1 auto; }
+.link-btn { color: var(--paprika); font-weight: 700; text-decoration: underline; font-size: inherit; }
+.seg { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; margin-top: 10px; }
+.img-check { display: grid; gap: 8px; }
+.img-check .verdict { margin: 0; }
+.img-prev { height: 120px; border-radius: var(--r-md); background: #cbbfa8 center / cover; }
+.vtabbar .dot-badge { margin-left: 10px; top: 4px; }
+.auth-h { font-family: var(--serif); font-size: 26px; font-weight: 600; letter-spacing: -0.02em; }
+.auth-h em { color: var(--paprika); font-weight: 500; }
+@media (min-width: 960px) { .demo-bar { margin-top: 18px; } }

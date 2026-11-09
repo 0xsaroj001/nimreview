@@ -3,11 +3,13 @@ import { Review } from '../models/Review.js';
 import { User } from '../models/User.js';
 import { BillCode } from '../models/BillCode.js';
 import { LedgerEntry } from '../models/LedgerEntry.js';
-import { settle } from './wallet.controller.js';
-import { venueJson, userJson, reviewJson, billJson, ledgerJson } from '../views/serialize.js';
+import { settle, settleVenue } from './wallet.controller.js';
+import { venueJson, userJson, reviewJson, billJson, ledgerJson, payoutJson } from '../views/serialize.js';
 
 // Everything one signed-in user's screens need, in the same shape as the demo data set.
-// Customers get their wallet; venue accounts get their bill codes. Neither sees the other's private data.
+// Customers get their wallet; venue accounts get their bill codes and what they owe their guests (reward entries and
+// cash-out requests, the latter with the guest's name and wallet so the venue knows whom to pay). Neither sees the
+// other's private data.
 export async function bootstrap(req, res) {
   const me = req.user;
   const meId = String(me._id);
@@ -36,6 +38,10 @@ export async function bootstrap(req, res) {
 
   if (me.role === 'venue' && myVenue) {
     out.receipts = (await BillCode.find({ venue: myVenue._id }).sort({ issuedAt: -1 }).limit(50)).map(billJson);
+    await settleVenue(myVenue._id);
+    const entries = await LedgerEntry.find({ venue: myVenue._id }).sort({ at: -1 }).limit(500);
+    const guests = Object.fromEntries((await User.find({ _id: { $in: [...new Set(entries.filter((e) => e.type === 'cashout').map((e) => String(e.user)))] } })).map((u) => [String(u._id), u]));
+    out.ledger = entries.map((e) => (e.type === 'cashout' ? payoutJson(e, guests[String(e.user)]) : ledgerJson(e)));
   }
   if (me.role === 'customer') {
     out.ledger = (await LedgerEntry.find({ user: me._id }).sort({ at: -1 })).map(ledgerJson);

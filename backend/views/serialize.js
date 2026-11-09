@@ -21,6 +21,7 @@ export const venueJson = (v) => ({
   menu: v.menu,
   nimAddress: v.nimAddress,
   rewardPerReview: v.rewardPerReview,
+  payoutCooldownDays: v.payoutCooldownDays,
 });
 
 // Public profile. The wallet address is only included for the signed-in user.
@@ -32,7 +33,7 @@ export const userJson = (u, { self = false, ownsVenueIds = [] } = {}) => ({
   reviewCount: u.reviewCount,
   helpfulVotes: u.helpfulVotes,
   upheldFlags: u.upheldFlags,
-  ...(self ? { email: u.email, nimAddress: u.nimAddress, walletLabel: u.walletLabel, ownsVenueIds } : {}),
+  ...(self ? { nimAddress: u.nimAddress, ownsVenueIds } : {}),
 });
 
 export const reviewJson = (r) => ({
@@ -71,4 +72,15 @@ export const ledgerJson = (e) => ({
   status: e.status,
   at: ms(e.at),
   releaseAt: ms(e.releaseAt),
+  toAddress: e.toAddress || undefined,
+  txHash: e.txHash || undefined,
+  note: e.note || undefined,
+  paidAt: ms(e.paidAt) || undefined,
+});
+
+// What a venue sees of a guest's cash-out request: who to pay, where, how much.
+export const payoutJson = (e, guest) => ({
+  ...ledgerJson(e),
+  guestName: guest?.name || 'Guest',
+  guestAddress: e.toAddress,
 });

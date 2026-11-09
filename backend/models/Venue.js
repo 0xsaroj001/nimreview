@@ -11,11 +11,13 @@ const venueSchema = new mongoose.Schema(
     lat: { type: Number, min: -90, max: 90, required: true },
     lng: { type: Number, min: -180, max: 180, required: true },
     hours: { type: String, trim: true, maxlength: 40, default: '' },
-    img: { type: String, trim: true, maxlength: 500, default: '' },
+    img: { type: String, trim: true, maxlength: 1000, default: '' },
     menu: { type: [String], default: [] },
     nimAddress: { type: String, required: true },
     // NIM the venue commits per rewarded review (scaled by the genuineness score, never by the stars)
     rewardPerReview: { type: Number, min: 0, max: 1000, default: 10 },
+    // Days a guest waits after posting before the reward can be cashed out. 0 = instant. The venue's choice: it pays.
+    payoutCooldownDays: { type: Number, min: 0, max: 30, default: 3 },
   },
   { timestamps: true },
 );

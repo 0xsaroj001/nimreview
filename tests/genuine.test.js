@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   POLICY, evaluateReview, similarity, verifyReceipt, verifyPayment, verifyCheckin, analyzeContent,
   analyzeComposition, accountTrust, venueBurst, settleLedger, balances, weightedRating, makeReceiptCode,
-  normalizeCode, hamming,
+  normalizeCode, hamming, balancesByVenue,
 } from '../public/src/core/genuine.js';
 import { isValidAddress, makeAddress } from '../public/src/core/nimiq.js';
 
@@ -31,7 +31,7 @@ const evalWith = (over = {}) =>
   evaluateReview({
     review: { text: goodText, rating: 4, composition: typed, photoHashes: [], ...over.review },
     account: over.account || account,
-    venue,
+    venue: over.venue || venue,
     proof: over.proof || { method: 'receipt', code: 'k7q2m 9xh4t' },
     ctx: ctx(over.ctx),
   });
@@ -197,4 +197,48 @@ test('nimiq addresses: burn address checksum and generated addresses validate', 
   assert.equal(isValidAddress(venueAddr), true);
   assert.equal(isValidAddress(venueAddr.replace(/.$/, (c) => (c === '0' ? '1' : '0'))), false);
   assert.equal(isValidAddress('NQ07 0000'), false);
+});
+
+test('the venue sets the cooldown: 0 is instant, its days replace the account-tier wait', () => {
+  const tier = evalWith();
+  assert.equal(tier.reward.vestDays, POLICY.vestDays[tier.tier]); // no venue setting: account tiers
+  for (const days of [0, 1, 7, 30]) {
+    const r = evalWith({ venue: { ...venue, payoutCooldownDays: days } });
+    assert.equal(r.reward.vestDays, days);
+    assert.equal(r.reward.releaseAt, now + days * DAY);
+    assert.equal(r.reward.amount, tier.reward.amount); // the wait never changes the amount
+    assert.equal(r.rewardable, true);
+  }
+  assert.equal(evalWith({ venue: { ...venue, payoutCooldownDays: 99 } }).reward.vestDays, 30);
+  assert.equal(evalWith({ venue: { ...venue, payoutCooldownDays: -4 } }).reward.vestDays, 0);
+});
+
+test('cash-outs and perks come off the claimable balance; unlocking rewards cannot be spent', () => {
+  const entries = [
+    { type: 'reward', amount: 30, status: 'claimable' },
+    { type: 'reward', amount: 12.5, status: 'pending' },
+    { type: 'reward', amount: 9, status: 'voided' },
+    { type: 'cashout', amount: 10, status: 'requested' },
+    { type: 'coupon', amount: 4.5, status: 'done' },
+  ];
+  assert.deepEqual(balances(entries), { claimable: 15.5, pending: 12.5, earned: 42.5 });
+  // a rejected cash-out is refunded
+  assert.equal(balances([...entries, { type: 'cashout', amount: 5, status: 'rejected' }]).claimable, 15.5);
+});
+
+test('balances per venue: each venue only owes what it earned the guest, cash-outs and perks come out of that venue', () => {
+  const entries = [
+    { type: 'reward', venueId: 'a', amount: 30, status: 'claimable' },
+    { type: 'reward', venueId: 'a', amount: 7, status: 'pending' },
+    { type: 'reward', venueId: 'b', amount: 20, status: 'claimable' },
+    { type: 'reward', venueId: 'b', amount: 9, status: 'voided' },
+    { type: 'cashout', venueId: 'a', amount: 10, status: 'requested' },
+    { type: 'cashout', venueId: 'a', amount: 4, status: 'paid' },
+    { type: 'cashout', venueId: 'a', amount: 6, status: 'rejected' },
+    { type: 'coupon', venueId: 'b', amount: 15, status: 'done' },
+  ];
+  const by = balancesByVenue(entries);
+  assert.deepEqual(by.a, { claimable: 16, pending: 7, earned: 37 });
+  assert.deepEqual(by.b, { claimable: 5, pending: 0, earned: 20 });
+  assert.equal(by.a.claimable + by.b.claimable, balances(entries).claimable);
 });

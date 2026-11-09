@@ -104,7 +104,7 @@ export async function create(req, res) {
   let claimed = null;
   if (p.ok && p.method === 'receipt') {
     // the single-use guarantee: only one request can flip usedBy from null
-    claimed = await BillCode.findOneAndUpdate({ _id: receipts[0]._id, usedBy: null }, { usedBy: reviewId, usedByUser: user._id, usedAt: new Date(now) }, { new: true });
+    claimed = await BillCode.findOneAndUpdate({ _id: receipts[0]._id, usedBy: null }, { usedBy: reviewId, usedByUser: user._id, usedAt: new Date(now) }, { returnDocument: 'after' });
     if (!claimed) throw new HttpError(409, 'This bill code was already used for a review');
   }
 
@@ -131,9 +131,12 @@ export async function create(req, res) {
 
   await User.updateOne({ _id: user._id }, { $inc: { reviewCount: 1 } });
   if (result.rewardable) {
+    const amount = result.reward.amount;
+    // A 0-day cooldown (the venue chose instant) is claimable straight away; otherwise it unlocks at releaseAt.
+    const instant = result.reward.releaseAt <= now;
     const mine = await LedgerEntry.create({
       user: user._id, type: 'reward', review: reviewId, venue: venue._id, label: `Review · ${venue.name}`,
-      amount: result.reward.amount, status: 'pending', at: new Date(now), releaseAt: new Date(result.reward.releaseAt),
+      amount, status: instant ? 'claimable' : 'pending', at: new Date(now), releaseAt: new Date(result.reward.releaseAt),
     });
     // The fair-use limits were checked before this insert, so two submissions at the same moment (each with its
     // own bill code) could both pass. Re-check against every other live reward now that ours is stored; the
