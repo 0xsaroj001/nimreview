@@ -180,6 +180,24 @@ test('wallet sign-in: a signed challenge makes an account, the same wallet signs
   assert.equal((await mongoose.connection.collection('users').countDocuments({ nimAddress: w3.address })), 1);
 });
 
+test('an address stored by an old account is not proof: only a wallet that signed at sign-up owns an account', { skip }, async () => {
+  const w = newWallet();
+  // an account from before wallet sign-in: its address was pasted, never proven
+  const legacy = await mongoose.connection.collection('users').insertOne({ nimAddress: w.address, name: 'Old Owner', role: 'venue', email: 'old@example.test', createdAt: new Date(), updatedAt: new Date() });
+  const { res } = await walletLogin(w);
+  assert.equal(res.status, 200);
+  assert.equal(res.body.needsSignup, true, 'the legacy account must not be handed to whoever holds that address');
+  const made = await call('/auth/signup', { method: 'POST', body: { ticket: res.body.ticket, role: 'customer', name: 'New Person' } });
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  const mine = (await call('/bootstrap', { token: made.body.token })).body;
+  assert.notEqual(mine.meId, String(legacy.insertedId));
+  assert.equal(await mongoose.connection.collection('users').countDocuments({ nimAddress: w.address }), 2);
+  // and signing in again finds the proven account, not the old one
+  const again = await walletLogin(w);
+  assert.equal(again.res.body.session.name, 'New Person');
+  assert.equal(again.res.body.session.role, 'customer');
+});
+
 // ---------- the venue flow ----------
 test('live flow: owner lists, sets reward and cooldown, issues bill codes; a code works for exactly one review', { skip }, async () => {
   const venue = await venueWithCode(0, { payoutCooldownDays: 0 });
@@ -307,7 +325,7 @@ test('cash-out: the guest asks the venue, the venue pays on-chain, the server co
   const pay = (hash, token = venue.tok) => call(`/payouts/${id}/paid`, { method: 'POST', token, body: { txHash: hash } });
   const luna = Math.round(owed * 1e5);
   const H = (n) => n.toString(16).padStart(64, '0');
-  const tx = (over) => ({ from: wallets.venue40.address, to: guest.address, value: luna, confirmations: 3, executionResult: true, ...over });
+  const tx = (over) => ({ from: wallets.venue40.address, to: guest.address, value: luna, confirmations: 3, executionResult: true, timestamp: Date.now(), ...over });
 
   // refused: other venue, a guest, junk, a transaction the chain does not know (retry), and every kind of wrong payment
   assert.equal((await pay(H(1), other.tok)).status, 404);
@@ -326,6 +344,13 @@ test('cash-out: the guest asks the venue, the venue pays on-chain, the server co
   assert.equal((await pay(H(6))).status, 422);
   chainTxs.set(H(7), tx({ confirmations: 0 }));
   assert.equal((await pay(H(7))).status, 409);
+  // an older payment from the venue to this guest (before they asked) cannot settle the request
+  chainTxs.set(H(9), tx({ timestamp: Date.now() - 3600_000 }));
+  const stale = await pay(H(9));
+  assert.equal(stale.status, 422);
+  assert.match(stale.body.error, /before the guest asked/);
+  chainTxs.set(H(10), tx({ timestamp: undefined }));
+  assert.equal((await pay(H(10))).status, 422);
   assert.equal((await call('/bootstrap', { token: g })).body.ledger.find((e) => e.type === 'cashout').status, 'requested');
 
   // the real payment (a bigger amount than asked is fine) settles it, exactly once

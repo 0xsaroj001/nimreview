@@ -62,7 +62,8 @@ export async function wallet(req, res) {
     if (err.code === 11000) throw new HttpError(401, 'That sign-in was already used. Start again.');
     throw err;
   }
-  const user = await User.findOne({ nimAddress: proved.address });
+  // only accounts whose wallet was proven by a signature match; an address someone once pasted proves nothing
+  const user = await User.findOne({ nimAddress: proved.address, walletProven: true });
   if (user) return res.json(await signedIn(user));
   res.json({ needsSignup: true, address: proved.address, ticket: signToken({ typ: 'signup', address: proved.address }, '15m') });
 }
@@ -75,12 +76,12 @@ export async function signup(req, res) {
   if (given && (given.length < 2 || given.length > 40)) throw new HttpError(400, 'Name must be 2 to 40 characters');
   const name = given || `${role === 'venue' ? 'Owner' : 'Reviewer'} ${shortAddress(t.address).slice(-4)}`;
   try {
-    const user = await User.create({ nimAddress: t.address, name, role });
+    const user = await User.create({ nimAddress: t.address, walletProven: true, name, role });
     return res.status(201).json(await signedIn(user));
   } catch (err) {
     if (err.code !== 11000) throw err;
     // the same wallet signed up twice at once: it is the same person, so sign them in
-    const user = await User.findOne({ nimAddress: t.address });
+    const user = await User.findOne({ nimAddress: t.address, walletProven: true });
     if (!user) throw err;
     res.json(await signedIn(user));
   }

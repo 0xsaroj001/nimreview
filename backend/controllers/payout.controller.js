@@ -9,6 +9,9 @@ import { HttpError } from '../middleware/error.js';
 import { getTransaction, checkPayment } from '../utils/chain.js';
 import { ledgerJson } from '../views/serialize.js';
 
+// a payment cannot predate the request it settles; allow a little for clock differences between us and the chain
+const CLOCK_SKEW_MS = 2 * 60_000;
+
 async function mineRequest(req) {
   const venue = await Venue.findOne({ owner: req.user._id });
   if (!venue) throw new HttpError(404, 'List your venue first');
@@ -22,7 +25,7 @@ export async function markPaid(req, res) {
   const { venue, entry } = await mineRequest(req);
   const txHash = String(req.body.txHash ?? '').trim().toLowerCase();
   if (!/^[0-9a-f]{64}$/.test(txHash)) throw new HttpError(400, 'A transaction hash has 64 hex characters');
-  const check = checkPayment(await getTransaction(txHash), { from: venue.nimAddress, to: entry.toAddress, amountNim: entry.amount });
+  const check = checkPayment(await getTransaction(txHash), { from: venue.nimAddress, to: entry.toAddress, amountNim: entry.amount, notBefore: entry.at.getTime() - CLOCK_SKEW_MS });
   if (!check.ok) throw new HttpError(check.retry ? 409 : 422, check.reason);
   let done;
   try {

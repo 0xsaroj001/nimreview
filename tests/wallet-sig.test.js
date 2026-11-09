@@ -32,8 +32,8 @@ test('wallet signatures: valid for every accepted signing form, refused for anyt
 });
 
 test('payment check: right sender, recipient, amount, success and a block', () => {
-  const ok = { from: 'NQ02 31N6 3KM5 T6G5 22TN EPF5 5XPY RLHK RMB3'.replace(/ /g, ''), to: 'NQ49N8MBXYCRXBUP404CKXKKL49MA7BTF082', valueLuna: lunaOf(12.3), confirmations: 2, executionResult: true };
-  const want = { from: 'NQ02 31N6 3KM5 T6G5 22TN EPF5 5XPY RLHK RMB3', to: 'nq49 n8mb xycr xbup 404c kxkk l49m a7bt f082', amountNim: 12.3 };
+  const ok = { from: 'NQ02 31N6 3KM5 T6G5 22TN EPF5 5XPY RLHK RMB3'.replace(/ /g, ''), to: 'NQ49N8MBXYCRXBUP404CKXKKL49MA7BTF082', valueLuna: lunaOf(12.3), timestamp: 1_000_000, confirmations: 2, executionResult: true };
+  const want = { from: 'NQ02 31N6 3KM5 T6G5 22TN EPF5 5XPY RLHK RMB3', to: 'nq49 n8mb xycr xbup 404c kxkk l49m a7bt f082', amountNim: 12.3, notBefore: 900_000 };
   assert.equal(lunaOf(12.3), 1_230_000);
   assert.equal(checkPayment(ok, want).ok, true);
   assert.equal(checkPayment(null, want).retry, true);
@@ -43,6 +43,9 @@ test('payment check: right sender, recipient, amount, success and a block', () =
   assert.equal(checkPayment({ ...ok, executionResult: false }, want).ok, false);
   assert.equal(checkPayment({ ...ok, confirmations: 0 }, want).retry, true);
   assert.equal(checkPayment({ ...ok, executionResult: undefined }, want).ok, true); // field absent: not a failure
+  assert.equal(checkPayment({ ...ok, timestamp: 899_999 }, want).ok, false); // paid before the guest asked
+  assert.equal(checkPayment({ ...ok, timestamp: 900_000 }, want).ok, true);
+  assert.equal(checkPayment({ ...ok, timestamp: NaN }, want).ok, false);
 });
 
 test('photo links pasted from Google', () => {

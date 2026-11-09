@@ -35,17 +35,22 @@ export async function getTransaction(hash) {
     from: normalizeAddress(t.from),
     to: normalizeAddress(t.to),
     valueLuna: Number(t.value),
+    timestamp: Number(t.timestamp),
     confirmations: Number(t.confirmations ?? 0),
     executionResult: t.executionResult,
   };
 }
 
-// Does this transaction pay `amountNim` (or more) from `from` to `to`, successfully and already in a block?
-export function checkPayment(tx, { from, to, amountNim }) {
+// Does this transaction pay `amountNim` (or more) from `from` to `to`, successfully and already in a block, and was it
+// sent after the guest asked (`notBefore`, ms)? Without the time check a venue could settle a new request with an
+// older, unrelated payment to the same guest.
+export function checkPayment(tx, { from, to, amountNim, notBefore = 0 }) {
   if (!tx) return { ok: false, retry: true, reason: 'The Nimiq network does not show that transaction yet. Wait a few seconds and try again.' };
   if (tx.from !== normalizeAddress(from)) return { ok: false, reason: 'That payment was not sent from your venue wallet.' };
   if (tx.to !== normalizeAddress(to)) return { ok: false, reason: "That payment did not go to the guest's wallet." };
   if (!(tx.valueLuna >= lunaOf(amountNim))) return { ok: false, reason: `That payment is less than ${amountNim} NIM.` };
+  if (!Number.isFinite(tx.timestamp)) return { ok: false, reason: 'The network did not say when that payment was made, so it cannot be matched to this request.' };
+  if (tx.timestamp < notBefore) return { ok: false, reason: 'That payment was made before the guest asked, so it cannot settle this request. Send a new payment.' };
   if (tx.executionResult === false) return { ok: false, reason: 'That transaction failed on the network.' };
   if (!(tx.confirmations >= 1)) return { ok: false, retry: true, reason: 'The payment is not confirmed yet. Wait a few seconds and try again.' };
   return { ok: true };

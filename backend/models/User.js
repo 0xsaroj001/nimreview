@@ -6,6 +6,9 @@ import mongoose from 'mongoose';
 const userSchema = new mongoose.Schema(
   {
     nimAddress: { type: String, required: true },
+    // true only when the wallet signed a challenge at sign-up. Accounts from before wallet sign-in stored an address
+    // that was merely pasted (never proven), so they are never matched to a wallet and never block a real one.
+    walletProven: { type: Boolean, default: false },
     name: { type: String, required: true, trim: true, maxlength: 40 },
     role: { type: String, enum: ['customer', 'venue'], required: true },
     reviewCount: { type: Number, default: 0 },
@@ -17,7 +20,7 @@ const userSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
-// partial, so accounts from before wallet sign-in (no address) do not collide with each other
-userSchema.index({ nimAddress: 1 }, { unique: true, partialFilterExpression: { nimAddress: { $type: 'string' } } });
+// one proven wallet, one account; older accounts with unproven addresses are outside the index
+userSchema.index({ nimAddress: 1 }, { unique: true, partialFilterExpression: { walletProven: true } });
 
 export const User = mongoose.models.User || mongoose.model('User', userSchema);
